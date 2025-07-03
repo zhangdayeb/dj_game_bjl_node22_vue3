@@ -1,9 +1,9 @@
 // src/services/httpClient.ts
-import axios, { 
-  AxiosInstance, 
-  AxiosRequestConfig, 
-  AxiosResponse, 
-  AxiosError 
+import axios, {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+  AxiosError
 } from 'axios'
 import type { ApiResponse, ApiConfig } from '@/types/api'
 
@@ -18,8 +18,8 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
 
 // 默认配置
 const defaultConfig: ApiConfig = {
-  baseURL: getEnvVar('VITE_API_BASE_URL', 'https://sicboapi.wuming888.com'),
-  wsURL: getEnvVar('VITE_WS_URL', 'wss://wsssicbo.wuming888.com'),
+  baseURL: getEnvVar('VITE_API_BASE_URL', 'https://bjlapi.ampj998.top'),
+  wsURL: getEnvVar('VITE_WS_URL', 'wss://wssbjl.ampj998.top'),
   timeout: 10000,
   retryAttempts: 3,
   retryDelay: 1000
@@ -98,11 +98,11 @@ export class HttpClient {
               ;(error as any).response = response
               throw error
             }
-            
+
             // 成功响应：code 为 200 或 1
             if (response.data.code === 200 || response.data.code === 1) {
               return response
-            } 
+            }
             // 业务失败：code 不是成功状态
             else {
               const error = new Error(response.data.message || '操作失败')
@@ -150,7 +150,7 @@ export class HttpClient {
 
   private async handleResponseError(error: AxiosError): Promise<never> {
     const config = error.config as AxiosRequestConfig & { _retryCount?: number }
-    
+
     // 401错误 - token无效，清除token
     if (error.response?.status === 401) {
       this.clearAuthToken()
@@ -178,7 +178,7 @@ export class HttpClient {
   private shouldRetry(error: AxiosError): boolean {
     // 网络错误
     if (!error.response) return true
-    
+
     // 服务器错误 (5xx)
     const status = error.response.status
     return status >= 500 && status < 600
@@ -186,19 +186,19 @@ export class HttpClient {
 
   private canRetry(config?: AxiosRequestConfig & { _retryCount?: number }): boolean {
     if (!config) return false
-    
+
     const retryCount = config._retryCount || 0
     return retryCount < this.config.retryAttempts
   }
 
   private async retryRequest(config: AxiosRequestConfig & { _retryCount?: number }): Promise<never> {
     config._retryCount = (config._retryCount || 0) + 1
-    
+
     // 延迟重试
-    await new Promise(resolve => 
+    await new Promise(resolve =>
       setTimeout(resolve, this.config.retryDelay * config._retryCount!)
     )
-    
+
     return this.client.request(config)
   }
 
@@ -268,11 +268,11 @@ export class HttpClient {
 
   updateConfig(newConfig: Partial<ApiConfig>): void {
     this.config = { ...this.config, ...newConfig }
-    
+
     if (newConfig.baseURL) {
       this.client.defaults.baseURL = newConfig.baseURL
     }
-    
+
     if (newConfig.timeout) {
       this.client.defaults.timeout = newConfig.timeout
     }

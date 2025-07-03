@@ -1,5 +1,5 @@
 // src/services/websocket.ts
-import type { 
+import type {
   GameParams,
   WSConnectionStatus
 } from '@/types/api'
@@ -58,14 +58,14 @@ export class GameWebSocketService {
   }
 
   private buildWSURL(): string {
-    const baseURL = import.meta.env.VITE_WS_URL || 'wss://wsssicbo.wuming888.com'
+    const baseURL = import.meta.env.VITE_WS_URL || 'wss://wssbjl.ampj998.top'
     return baseURL
   }
 
   private initEventListeners(): void {
     const events = [
       'countdown',
-      'game_result', 
+      'game_result',
       'win_data',
       'game_status',
       'connected',
@@ -73,7 +73,7 @@ export class GameWebSocketService {
       'reconnecting',
       'error'
     ]
-    
+
     events.forEach(event => {
       this.eventListeners.set(event, new Set())
     })
@@ -88,7 +88,7 @@ export class GameWebSocketService {
       this.setConnectionStatus('connecting')
       this.isManualDisconnect = false
       this.ws = new WebSocket(this.wsURL)
-      
+
       const connectTimeout = setTimeout(() => {
         if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
           this.ws.close()
@@ -118,7 +118,7 @@ export class GameWebSocketService {
       this.ws.onerror = (error) => {
         clearTimeout(connectTimeout)
         this.setConnectionStatus('error')
-        this.emit('error', { 
+        this.emit('error', {
           message: 'WebSocket连接错误',
           originalError: error
         })
@@ -130,24 +130,24 @@ export class GameWebSocketService {
   disconnect(): void {
     this.isManualDisconnect = true
     this.stopHeartbeat()
-    
+
     if (this.ws) {
       this.ws.onclose = null
       this.ws.close()
       this.ws = null
     }
-    
+
     this.setConnectionStatus('disconnected')
   }
 
   private handleClose(event: CloseEvent): void {
     this.stopHeartbeat()
     this.setConnectionStatus('disconnected')
-    this.emit('disconnected', { 
-      code: event.code, 
+    this.emit('disconnected', {
+      code: event.code,
       reason: event.reason
     })
-    
+
     if (!this.isManualDisconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
       this.scheduleReconnect()
     }
@@ -156,13 +156,13 @@ export class GameWebSocketService {
   private scheduleReconnect(): void {
     this.reconnectAttempts++
     const delay = Math.min(this.reconnectInterval * this.reconnectAttempts, 30000)
-    
+
     this.setConnectionStatus('reconnecting')
-    this.emit('reconnecting', { 
-      attempt: this.reconnectAttempts, 
+    this.emit('reconnecting', {
+      attempt: this.reconnectAttempts,
       delay
     })
-    
+
     setTimeout(() => {
       if (this.connectionStatus === 'reconnecting' && !this.isManualDisconnect) {
         this.connect().catch(() => {})
@@ -211,7 +211,7 @@ export class GameWebSocketService {
     try {
       const rawData = JSON.parse(event.data)
       const parsedMessage = this.parseMessage(rawData)
-      
+
       if (parsedMessage) {
         this.emit(parsedMessage.type, parsedMessage.data)
       }
@@ -235,7 +235,7 @@ export class GameWebSocketService {
         } as CountdownData
       }
     }
-    
+
     // 开牌结果推送
     if (rawData.code === 200 && rawData.data?.result_info) {
       const resultInfo = rawData.data.result_info
@@ -244,7 +244,7 @@ export class GameWebSocketService {
       const dice2 = parseInt(diceInfo.dice2) || 0
       const dice3 = parseInt(diceInfo.dice3) || 0
       const total = dice1 + dice2 + dice3
-      
+
       const gameResult = {
         type: 'game_result',
         data: {
@@ -258,7 +258,7 @@ export class GameWebSocketService {
           game_number: rawData.data.bureau_number || ''
         } as GameResultData
       }
-      
+
       // 如果有中奖金额，同时触发中奖数据
       if (resultInfo.money !== undefined) {
         setTimeout(() => {
@@ -268,10 +268,10 @@ export class GameWebSocketService {
           } as WinData)
         }, 0)
       }
-      
+
       return gameResult
     }
-    
+
     // 洗牌状态推送
     if (rawData.code === 207) {
       return {
@@ -282,7 +282,7 @@ export class GameWebSocketService {
         } as GameStatusData
       }
     }
-    
+
     // 用户下注推送 (余额变化)
     if (rawData.code === 209) {
       return {
@@ -293,7 +293,7 @@ export class GameWebSocketService {
         }
       }
     }
-    
+
     return null
   }
 
@@ -350,7 +350,7 @@ export class GameWebSocketService {
   }
 
   isConnected(): boolean {
-    return this.connectionStatus === 'connected' && 
+    return this.connectionStatus === 'connected' &&
            this.ws?.readyState === WebSocket.OPEN
   }
 
@@ -378,7 +378,7 @@ export class GameWebSocketService {
   updateGameParams(newParams: Partial<GameParams>): void {
     this.gameParams = { ...this.gameParams, ...newParams }
     this.wsURL = this.buildWSURL()
-    
+
     if (this.isConnected()) {
       this.reconnect()
     }

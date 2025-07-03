@@ -1,10 +1,10 @@
 // src/services/gameApi.ts
 import { httpClient, setAuthToken } from './httpClient'
 import type { GameParams } from '@/types/api'
-import type { 
-  BettingHistoryParams, 
-  BettingHistoryResponse, 
-  BettingRecord 
+import type {
+  BettingHistoryParams,
+  BettingHistoryResponse,
+  BettingRecord
 } from '@/types/bettingHistory'
 
 // 台桌信息接口
@@ -66,7 +66,7 @@ export class GameApiService {
    * 获取台桌信息
    */
   async getTableInfo(): Promise<TableInfo> {
-    const response = await httpClient.get<TableInfo>('/sicbo/get_table/table_info', {
+    const response = await httpClient.get<TableInfo>('/bjl/get_table/table_info', {
       tableId: this.gameParams.table_id,
       gameType: this.gameParams.game_type
     })
@@ -77,7 +77,7 @@ export class GameApiService {
    * 获取用户信息
    */
   async getUserInfo(): Promise<UserInfo> {
-    const response = await httpClient.get<UserInfo>('/sicbo/user/info', {
+    const response = await httpClient.get<UserInfo>('/bjl/user/info', {
       user_id: this.gameParams.user_id
     })
     return response
@@ -94,7 +94,7 @@ export class GameApiService {
       bet: bets
     }
 
-    const response = await httpClient.post<BetResponse>('/sicbo/bet/order', requestData)
+    const response = await httpClient.post<BetResponse>('/bjl/bet/order', requestData)
     return response
   }
 
@@ -102,7 +102,7 @@ export class GameApiService {
    * 获取当前投注记录
    */
   async getCurrentBets(): Promise<any> {
-    const response = await httpClient.post('/sicbo/current/record', {
+    const response = await httpClient.post('/bjl/current/record', {
       id: parseInt(this.gameParams.table_id)
     })
     return response
@@ -112,7 +112,7 @@ export class GameApiService {
    * 获取露珠数据
    */
   async getRoadmapData(): Promise<any> {
-    const response = await httpClient.get('/sicbo/get_table/get_data', {
+    const response = await httpClient.get('/bjl/get_table/get_data', {
       tableId: this.gameParams.table_id
     })
     return response
@@ -132,7 +132,7 @@ async getBettingHistory(params: BettingHistoryParams): Promise<BettingHistoryRes
     end_date: params.end_date
   }
 
-  const response = await httpClient.get<BettingHistoryResponse>('/sicbo/bet/history', requestParams)
+  const response = await httpClient.get<BettingHistoryResponse>('/bjl/bet/history', requestParams)
   return response  // 响应拦截器已经处理过，直接返回业务数据
 }
 
@@ -140,7 +140,7 @@ async getBettingHistory(params: BettingHistoryParams): Promise<BettingHistoryRes
    * 获取投注记录详情
    */
   async getBettingDetail(recordId: string): Promise<BettingDetailResponse> {
-    const response = await httpClient.get<BettingDetailResponse>(`/sicbo/bet/detail/${recordId}`, {
+    const response = await httpClient.get<BettingDetailResponse>(`/bjl/bet/detail/${recordId}`, {
       user_id: this.gameParams.user_id
     })
     return response
@@ -151,7 +151,7 @@ async getBettingHistory(params: BettingHistoryParams): Promise<BettingHistoryRes
    */
   updateGameParams(newParams: Partial<GameParams>): void {
     this.gameParams = { ...this.gameParams, ...newParams }
-    
+
     if (newParams.token) {
       setAuthToken(newParams.token)
     }
@@ -188,15 +188,15 @@ export const getGlobalApiService = (): GameApiService => {
 export const initializeGameApi = async (params: GameParams) => {
   const apiService = createGameApiService(params)
   setGlobalApiService(apiService)
-  
+
   const [tableInfo, userInfo] = await Promise.all([
     apiService.getTableInfo(),
     apiService.getUserInfo()
   ])
-  
+
   return {
     apiService,
     tableInfo,
     userInfo
-  } 
+  }
 }

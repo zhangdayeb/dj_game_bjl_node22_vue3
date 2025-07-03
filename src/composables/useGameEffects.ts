@@ -89,11 +89,11 @@ export interface DiceEffectOptions {
 
 export const useGameEffects = () => {
   // 🔥 修改：使用简化后的音频系统
-  const { 
-    playSound, 
-    playWinSound, 
+  const {
+    playSound,
+    playWinSound,
     playDiceRollSound,
-    canPlayAudio 
+    canPlayAudio
   } = useAudio()
 
   // 特效配置
@@ -256,8 +256,8 @@ export const useGameEffects = () => {
       // 🔥 修改：使用简化后的音频系统播放摇骰音效
       await safePlaySound(() => playDiceRollSound())
 
-      const totalDuration = (options.cupShakeDuration || 2000) + 
-                           (options.rollDuration || 2000) + 
+      const totalDuration = (options.cupShakeDuration || 2000) +
+                           (options.rollDuration || 2000) +
                            (options.revealDelay || 1000)
 
       const effectInstance: EffectInstance = {
@@ -353,7 +353,7 @@ export const useGameEffects = () => {
 
     const effectId = generateEffectId('particles')
     const particleCount = Math.floor(50 * options.density * qualityMultiplier.value)
-    
+
     const particles: Particle[] = []
     const colors = options.colors || ['#FFD700', '#FFA500', '#FF6B6B', '#4ECDC4', '#45B7D1']
 
@@ -410,7 +410,7 @@ export const useGameEffects = () => {
         // 更新位置
         particle.x += particle.vx * deltaTime / 1000
         particle.y += particle.vy * deltaTime / 1000
-        
+
         // 重力效果
         particle.vy += 300 * deltaTime / 1000
 
@@ -423,7 +423,7 @@ export const useGameEffects = () => {
 
         if (particle.life > 0) {
           aliveParticles++
-          
+
           // 创建DOM元素（简化版）
           createParticleElement(particle)
         }
@@ -627,7 +627,7 @@ export const useGameEffects = () => {
 
   const saveConfig = (): void => {
     try {
-      localStorage.setItem('sicbo_effects_config', JSON.stringify(config))
+      localStorage.setItem('bjl_effects_config', JSON.stringify(config))
     } catch (error) {
       console.error('❌ 保存特效配置失败:', error)
     }
@@ -635,7 +635,7 @@ export const useGameEffects = () => {
 
   const loadConfig = (): void => {
     try {
-      const saved = localStorage.getItem('sicbo_effects_config')
+      const saved = localStorage.getItem('bjl_effects_config')
       if (saved) {
         const savedConfig = JSON.parse(saved)
         Object.assign(config, savedConfig)
@@ -675,37 +675,37 @@ export const useGameEffects = () => {
     config,
     activeEffects: readonly(activeEffects),
     screenShakeState: readonly(screenShakeState),
-    
+
     // 计算属性
     canPlayEffects,
     effectiveSpeed,
     qualityMultiplier,
-    
+
     // 组件引用设置
     setWinningEffectRef,
     setDiceRollingEffectRef,
-    
+
     // 特效播放
     playWinEffect,
     playDiceEffect,
     playScreenShake,
     playParticleEffect,
     playGlowEffect,
-    
+
     // 复合特效
     playBetConfirmEffect,
-    
+
     // 控制方法
     stopEffect,
     stopAllEffects,
     queueEffect,
-    
+
     // 配置管理
     updateConfig,
     saveConfig,
     loadConfig,
     getPerformanceInfo,
-    
+
     // 🔥 新增：音频相关方法
     safePlaySound,
     getAudioInfo

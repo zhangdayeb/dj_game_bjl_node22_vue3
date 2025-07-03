@@ -139,7 +139,7 @@ export const useChipSettings = () => {
     if (!preset) return false
 
     // 验证预设中的筹码是否都可用
-    const validChips = preset.chips.filter(value => 
+    const validChips = preset.chips.filter(value =>
       enabledChips.value.some(chip => chip.value === value)
     )
 
@@ -148,15 +148,15 @@ export const useChipSettings = () => {
     // 如果预设筹码少于5个，用默认值补齐
     const finalChips = [...validChips]
     if (finalChips.length < 5) {
-      const defaultChips = defaultSettings.favorites.filter(value => 
-        !finalChips.includes(value) && 
+      const defaultChips = defaultSettings.favorites.filter(value =>
+        !finalChips.includes(value) &&
         enabledChips.value.some(chip => chip.value === value)
       )
       finalChips.push(...defaultChips.slice(0, 5 - finalChips.length))
     }
 
     settings.favorites = finalChips.slice(0, 5)
-    
+
     // 确保默认筹码在常用筹码中
     if (!settings.favorites.includes(settings.defaultChip)) {
       settings.defaultChip = settings.favorites[0]
@@ -174,7 +174,7 @@ export const useChipSettings = () => {
       description,
       chips: chips.slice(0, 5)
     }
-    
+
     presets.value.push(newPreset)
     saveToLocalStorage()
     return id
@@ -183,7 +183,7 @@ export const useChipSettings = () => {
   // 删除自定义预设
   const deleteCustomPreset = (presetId: string): boolean => {
     if (!presetId.startsWith('custom_')) return false
-    
+
     const index = presets.value.findIndex(p => p.id === presetId)
     if (index > -1) {
       presets.value.splice(index, 1)
@@ -272,7 +272,7 @@ export const useChipSettings = () => {
   // 获取筹码统计信息
   const getChipUsageStats = (): Record<number, { count: number; totalAmount: number; lastUsed: Date | null }> => {
     try {
-      const stats = localStorage.getItem('sicbo_chip_usage_stats')
+      const stats = localStorage.getItem('bjl_chip_usage_stats')
       return stats ? JSON.parse(stats) : {}
     } catch {
       return {}
@@ -286,12 +286,12 @@ export const useChipSettings = () => {
       if (!stats[chipValue]) {
         stats[chipValue] = { count: 0, totalAmount: 0, lastUsed: null }
       }
-      
+
       stats[chipValue].count++
       stats[chipValue].totalAmount += amount
       stats[chipValue].lastUsed = new Date()
-      
-      localStorage.setItem('sicbo_chip_usage_stats', JSON.stringify(stats))
+
+      localStorage.setItem('bjl_chip_usage_stats', JSON.stringify(stats))
     } catch (error) {
       console.warn('Failed to record chip usage:', error)
     }
@@ -301,20 +301,20 @@ export const useChipSettings = () => {
   const getSmartRecommendations = (balance: number, gameHistory: any[] = []): ChipConfig[] => {
     const usageStats = getChipUsageStats()
     const availableChips = getRecommendedChips(balance)
-    
+
     // 基于使用频率和余额推荐
     const scored = availableChips.map(chip => {
       const usage = usageStats[chip.value] || { count: 0, totalAmount: 0, lastUsed: null }
       const balanceRatio = chip.value / balance
       const usageScore = usage.count * 0.4 + (usage.totalAmount / 10000) * 0.3
       const balanceScore = balanceRatio < 0.01 ? 1 : balanceRatio < 0.05 ? 0.8 : 0.5
-      
+
       return {
         chip,
         score: usageScore + balanceScore
       }
     })
-    
+
     return scored
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
@@ -329,7 +329,7 @@ export const useChipSettings = () => {
         customPresets: presets.value.filter(p => p.id.startsWith('custom_')),
         timestamp: Date.now()
       }
-      localStorage.setItem('sicbo_chip_settings', JSON.stringify(data))
+      localStorage.setItem('bjl_chip_settings', JSON.stringify(data))
     } catch (error) {
       console.warn('Failed to save chip settings:', error)
     }
@@ -338,10 +338,10 @@ export const useChipSettings = () => {
   // 从本地存储加载
   const loadFromLocalStorage = (): void => {
     try {
-      const saved = localStorage.getItem('sicbo_chip_settings')
+      const saved = localStorage.getItem('bjl_chip_settings')
       if (saved) {
         const data = JSON.parse(saved)
-        
+
         // 加载设置
         if (data.settings) {
           const validation = validateSettings(data.settings)
@@ -349,7 +349,7 @@ export const useChipSettings = () => {
             Object.assign(settings, data.settings)
           }
         }
-        
+
         // 加载自定义预设
         if (data.customPresets && Array.isArray(data.customPresets)) {
           // 移除旧的自定义预设
@@ -378,21 +378,21 @@ export const useChipSettings = () => {
   const importSettings = (jsonData: string): boolean => {
     try {
       const data = JSON.parse(jsonData)
-      
+
       if (data.settings) {
         const validation = validateSettings(data.settings)
         if (validation.isValid) {
           Object.assign(settings, data.settings)
         }
       }
-      
+
       if (data.customPresets && Array.isArray(data.customPresets)) {
         // 移除现有自定义预设
         presets.value = presets.value.filter(p => !p.id.startsWith('custom_'))
         // 添加导入的预设
         presets.value.push(...data.customPresets)
       }
-      
+
       saveToLocalStorage()
       return true
     } catch (error) {
@@ -412,12 +412,12 @@ export const useChipSettings = () => {
     presets,
     settings,
     tempSettings,
-    
+
     // 计算属性
     favoriteChips,
     enabledChips,
     availableChips,
-    
+
     // 方法
     getRecommendedChips,
     getChipImagePath,

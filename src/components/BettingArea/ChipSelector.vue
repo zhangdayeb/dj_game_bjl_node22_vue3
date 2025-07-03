@@ -13,20 +13,20 @@
             :class="{ 'active': selectedChip === chip.value }"
             @click="selectChip(chip.value)"
           >
-            <img 
-              :src="getChipImage(chip.value, 'selected')" 
+            <img
+              :src="getChipImage(chip.value, 'selected')"
               :alt="chip.label"
               class="chip-image"
             />
           </button>
-          
+
           <!-- 设置按钮 -->
           <button
             class="chip-btn settings-btn"
             @click="openSettings"
           >
-            <img 
-              src="/images/chips/chip.png" 
+            <img
+              src="/images/chips/chip.png"
               alt="设置"
               class="chip-image settings-icon"
             />
@@ -35,8 +35,8 @@
       </div>
 
       <!-- 设置弹窗 -->
-      <n-modal 
-        v-model:show="showSettings" 
+      <n-modal
+        v-model:show="showSettings"
         preset="card"
         :style="{ width: 'min(90vw, 650px)' }"
         title="筹码配置中心"
@@ -51,7 +51,7 @@
       >
         <template #header>
           <n-space align="center" :size="12">
-            <n-avatar 
+            <n-avatar
               :size="32"
               color="transparent"
               style="background: linear-gradient(135deg, #ffd700, #ffed4e)"
@@ -72,7 +72,7 @@
         <n-scrollbar style="max-height: 70vh;">
           <div class="settings-content">
             <!-- 当前配置卡片 -->
-            <n-card 
+            <n-card
               class="current-config-card"
               :bordered="false"
               size="small"
@@ -85,10 +85,10 @@
                   <n-text strong>当前配置</n-text>
                 </n-space>
               </template>
-              
+
               <n-space justify="space-between" align="center">
-                <n-statistic 
-                  label="已选择筹码" 
+                <n-statistic
+                  label="已选择筹码"
                   :value="tempFavorites.length"
                   :value-style="{ color: '#00bcd4', fontSize: '20px', fontWeight: 'bold' }"
                 >
@@ -96,8 +96,8 @@
                     <n-text depth="2">/ 5</n-text>
                   </template>
                 </n-statistic>
-                
-                <n-button 
+
+                <n-button
                   size="small"
                   type="primary"
                   ghost
@@ -111,10 +111,10 @@
                   恢复默认
                 </n-button>
               </n-space>
-              
+
               <!-- 进度条 -->
-              <n-progress 
-                type="line" 
+              <n-progress
+                type="line"
                 :percentage="(tempFavorites.length / 5) * 100"
                 :height="6"
                 :border-radius="3"
@@ -125,7 +125,7 @@
             </n-card>
 
             <!-- 筹码选择区域 -->
-            <n-card 
+            <n-card
               class="chips-selection-card"
               :bordered="false"
               size="small"
@@ -138,8 +138,8 @@
                     </n-icon>
                     <n-text strong>选择筹码</n-text>
                   </n-space>
-                  <n-tag 
-                    type="info" 
+                  <n-tag
+                    type="info"
                     size="small"
                     :bordered="false"
                     class="instruction-tag"
@@ -148,7 +148,7 @@
                   </n-tag>
                 </n-space>
               </template>
-              
+
               <!-- 筹码网格 -->
               <div class="chips-grid">
                 <n-tooltip
@@ -161,7 +161,7 @@
                   <template #trigger>
                     <div
                       class="chip-item"
-                      :class="{ 
+                      :class="{
                         'selected': tempFavorites.includes(chip.value),
                         'disabled': !tempFavorites.includes(chip.value) && tempFavorites.length >= 5
                       }"
@@ -169,14 +169,14 @@
                     >
                       <!-- 筹码图像 -->
                       <div class="chip-item-image">
-                        <img 
-                          :src="getChipImage(chip.value, 'all')" 
+                        <img
+                          :src="getChipImage(chip.value, 'all')"
                           :alt="chip.label"
                           class="chip-img"
                         />
-                        
+
                         <!-- 选中覆盖层 -->
-                        <div 
+                        <div
                           v-if="tempFavorites.includes(chip.value)"
                           class="selection-overlay"
                         >
@@ -184,7 +184,7 @@
                             <CheckIcon />
                           </n-icon>
                         </div>
-                        
+
                         <!-- 选中序号 -->
                         <n-badge
                           v-if="tempFavorites.includes(chip.value)"
@@ -194,9 +194,9 @@
                           color="#e74c3c"
                         />
                       </div>
-                      
+
                       <!-- 筹码标签 -->
-                      <n-text 
+                      <n-text
                         class="chip-label"
                         :type="tempFavorites.includes(chip.value) ? 'success' : 'default'"
                         strong
@@ -220,7 +220,7 @@
               </template>
               取消
             </n-button>
-            <n-button 
+            <n-button
               type="primary"
               @click="saveSettings"
               :disabled="tempFavorites.length === 0"
@@ -231,7 +231,7 @@
               </template>
               <n-space align="center" :size="8">
                 <span>保存设置</span>
-                <n-badge 
+                <n-badge
                   v-if="tempFavorites.length > 0"
                   :value="tempFavorites.length"
                   :max="5"
@@ -248,7 +248,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { 
+import {
   NConfigProvider,
   NSpace,
   NButton,
@@ -264,7 +264,7 @@ import {
   NProgress,
   NTag,
   NBadge,
-  useMessage 
+  useMessage
 } from 'naive-ui'
 import {
   Settings as SettingsIcon,
@@ -282,19 +282,19 @@ const gameTheme = {
     primaryColor: '#27ae60',
     primaryColorHover: '#2ecc71',
     primaryColorPressed: '#229954',
-    
+
     baseColor: 'rgba(13, 40, 24, 0.95)',
     modalColor: 'rgba(0, 0, 0, 0.95)',
     cardColor: 'rgba(45, 90, 66, 0.4)',
-    
+
     textColorBase: '#ffffff',
     textColor1: 'rgba(255, 255, 255, 0.95)',
     textColor2: 'rgba(255, 255, 255, 0.82)',
     textColor3: 'rgba(255, 255, 255, 0.65)',
-    
+
     borderRadius: '8px',
     borderColor: 'rgba(255, 215, 0, 0.3)',
-    
+
     boxShadow1: '0 2px 8px rgba(0, 0, 0, 0.3)',
     boxShadow2: '0 4px 16px rgba(0, 0, 0, 0.4)',
     boxShadow3: '0 8px 32px rgba(0, 0, 0, 0.5)',
@@ -398,14 +398,14 @@ const isDefaultSelection = computed(() => {
 const getChipImage = (value: number, type: 'selected' | 'all'): string => {
   const chip = allChips.find(c => c.value === value)
   if (!chip) return ''
-  
+
   const prefix = type === 'selected' ? 'S_' : 'B_'
   return `/images/chips/${prefix}${chip.filename}.png`
 }
 
 const selectChip = (value: number): void => {
   emit('select-chip', value)
-  
+
   // 显示选择反馈
   message.info(`已选择 ${allChips.find(c => c.value === value)?.label} 筹码`)
 }
@@ -422,7 +422,7 @@ const closeSettings = (): void => {
 
 const toggleChipSelection = (value: number): void => {
   const index = tempFavorites.value.indexOf(value)
-  
+
   if (index > -1) {
     // 移除选择
     tempFavorites.value.splice(index, 1)
@@ -450,7 +450,7 @@ const saveSettings = (): void => {
     message.error('请至少选择一个筹码')
     return
   }
-  
+
   // 如果选择少于5个，用默认值补齐
   const finalFavorites = [...tempFavorites.value]
   if (finalFavorites.length < 5) {
@@ -458,22 +458,22 @@ const saveSettings = (): void => {
     const defaults = defaultFavorites.filter(v => !finalFavorites.includes(v))
     finalFavorites.push(...defaults.slice(0, needed))
   }
-  
+
   favoriteChipValues.value = finalFavorites.slice(0, 5)
-  
+
   // 保存到本地存储
   saveToLocalStorage()
-  
+
   // 发送事件
   emit('settings-changed', favoriteChipValues.value)
-  
+
   message.success('筹码设置已保存！')
   closeSettings()
 }
 
 const saveToLocalStorage = (): void => {
   try {
-    localStorage.setItem('sicbo_favorite_chips', JSON.stringify(favoriteChipValues.value))
+    localStorage.setItem('bjl_favorite_chips', JSON.stringify(favoriteChipValues.value))
   } catch (error) {
     console.warn('Failed to save chip settings:', error)
     message.error('保存设置失败')
@@ -482,7 +482,7 @@ const saveToLocalStorage = (): void => {
 
 const loadFromLocalStorage = (): void => {
   try {
-    const saved = localStorage.getItem('sicbo_favorite_chips')
+    const saved = localStorage.getItem('bjl_favorite_chips')
     if (saved) {
       const parsed = JSON.parse(saved)
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -752,21 +752,21 @@ onMounted(() => {
     width: 46px;
     height: 46px;
   }
-  
+
   .chips-grid {
     grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
     gap: 10px;
   }
-  
+
   .chip-item {
     padding: 10px 6px;
   }
-  
+
   .chip-item-image {
     width: 40px;
     height: 40px;
   }
-  
+
   .chip-img {
     width: 38px;
     height: 38px;
@@ -777,26 +777,26 @@ onMounted(() => {
   .chip-selector {
     padding: 8px 2px; /* 进一步减少边距 */
   }
-  
+
   .chip-list {
     gap: 2px;
     padding: 0 4px;
   }
-  
+
   .chip-image {
     width: 42px;
     height: 42px;
   }
-  
+
   .chips-grid {
     grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
     gap: 8px;
   }
-  
+
   .chip-item {
     padding: 8px 4px;
   }
-  
+
   .chip-label {
     font-size: 11px;
   }
@@ -807,7 +807,7 @@ onMounted(() => {
     width: 38px;
     height: 38px;
   }
-  
+
   .chip-list {
     gap: 1px;
     padding: 0 2px;
@@ -819,7 +819,7 @@ onMounted(() => {
   .settings-content {
     gap: 12px;
   }
-  
+
   .chips-grid {
     grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
     gap: 8px;

@@ -11,7 +11,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="right-section">
       <!-- 局号和余额两行布局 -->
       <div class="info-section">
@@ -20,7 +20,7 @@
           <span class="info-label">局号</span>
           <span class="game-number">{{ safeGameNumber }}</span>
         </div>
-        
+
         <!-- 余额行 -->
         <div class="info-row">
           <span class="info-label">余额</span>
@@ -33,16 +33,16 @@
 
       <!-- 🔥 新增：音频重试按钮 -->
       <div class="audio-retry" v-if="!canPlayAudio">
-        <button 
-          class="retry-btn" 
-          @click="handleAudioRetry" 
+        <button
+          class="retry-btn"
+          @click="handleAudioRetry"
           :disabled="isRetryingAudio"
           title="音频未就绪，点击重试"
         >
           {{ isRetryingAudio ? '⏳' : '🔊' }}
         </button>
       </div>
-      
+
       <!-- 设置按钮 -->
       <div class="settings-dropdown" ref="settingsDropdown">
         <button class="settings-btn" @click="toggleSettings">
@@ -52,7 +52,7 @@
             <span></span>
           </div>
         </button>
-        
+
         <!-- 下拉菜单 -->
         <div class="dropdown-menu" :class="{ 'show': showSettings }">
           <!-- 音效设置 -->
@@ -61,9 +61,9 @@
               <span class="item-label">背景音乐</span>
               <label class="switch">
                 <!-- 🔥 修改：新增防抖和禁用状态 -->
-                <input 
-                  type="checkbox" 
-                  v-model="safeBgmEnabled" 
+                <input
+                  type="checkbox"
+                  v-model="safeBgmEnabled"
                   @change="handleBackgroundMusicToggle"
                   :disabled="isTogglingMusic"
                 >
@@ -74,22 +74,22 @@
               <span class="item-label">音效</span>
               <label class="switch">
                 <!-- 🔥 修改：新增防抖和禁用状态 -->
-                <input 
-                  type="checkbox" 
-                  v-model="safeSfxEnabled" 
+                <input
+                  type="checkbox"
+                  v-model="safeSfxEnabled"
                   @change="handleSoundEffectsToggle"
                   :disabled="isTogglingSfx"
                 >
                 <span class="slider" :class="{ 'disabled': isTogglingSfx }"></span>
               </label>
             </div>
-          
+
             <!-- 投注记录 -->
             <div class="menu-item clickable" @click="openBettingHistory">
               <span class="item-label">💰 投注记录</span>
               <span class="arrow">›</span>
             </div>
-            
+
             <div class="menu-item clickable" @click="goToVip">
               <span class="item-label">👑 会员中心</span>
               <span class="arrow">›</span>
@@ -108,7 +108,7 @@
     </div>
 
     <!-- 投注记录弹窗 -->
-    <BettingHistoryModal 
+    <BettingHistoryModal
       v-if="showBettingHistory"
       v-model:show="showBettingHistory"
       @close="handleBettingHistoryClose"
@@ -120,7 +120,7 @@
 import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useGameData } from '@/composables/useGameData'
 import { useWebSocketEvents } from '@/composables/useWebSocketEvents'
-import { useAudio } from '@/composables/useAudio'
+import { useAudio } from '@/services/Audio'
 import { useBettingHistoryStore } from '@/stores/bettingHistoryStore'
 import BettingHistoryModal from '@/components/BettingHistory/BettingHistoryModal.vue'
 import { parseGameParams } from '@/utils/urlParams'
@@ -135,7 +135,7 @@ const referrerUrl = computed(() => {
       console.log('🔗 使用 userInfo.web_main:', userInfo.value.web_main)
       return userInfo.value.web_main
     }
-    
+
     // 降级到原有逻辑
     const fallback = document.referrer.split('?')[0] || 'about:blank'
     console.log('🔗 降级使用 document.referrer:', fallback)
@@ -159,13 +159,13 @@ const audioResult = useAudio()
 
 console.log('📊 组合式函数加载结果:')
 console.log('  - useGameData:', !!gameDataResult)
-console.log('  - useWebSocketEvents:', !!webSocketEventsResult) 
+console.log('  - useWebSocketEvents:', !!webSocketEventsResult)
 console.log('  - useAudio:', !!audioResult)
 
 // 解构真实数据
 const {
   tableInfo = ref(null),
-  userInfo = ref(null), 
+  userInfo = ref(null),
   formattedBalance = ref('---'),
   refreshBalance = () => Promise.resolve(),
   canOperate = ref(false)
@@ -181,7 +181,7 @@ const {
   audioContext,
   canPlayAudio,
   toggleMusic,
-  toggleSfx, 
+  toggleSfx,
   loadConfig: loadAudioConfig,
   isBackgroundMusicPlaying,
   getAudioInfo,
@@ -219,10 +219,10 @@ const safeTableName = computed(() => {
   try {
     const table = tableInfo.value
     if (table) {
-      return table.table_title || 
-             table.lu_zhu_name || 
-             table.name || 
-             table.tableName || 
+      return table.table_title ||
+             table.lu_zhu_name ||
+             table.name ||
+             table.tableName ||
              '骰宝桌台'
     }
     return '骰宝桌台'
@@ -236,7 +236,7 @@ const safeBetLimits = computed(() => {
   try {
     const table = tableInfo.value
     if (table) {
-      const limit = table.right_money_banker_player || 
+      const limit = table.right_money_banker_player ||
                    table.limits?.max ||
                    table.max_bet ||
                    20000
@@ -253,15 +253,15 @@ const safeGameNumber = computed(() => {
   try {
     const table = tableInfo.value
     const user = userInfo.value
-    
+
     if (table?.bureau_number) {
       return table.bureau_number
     }
-    
+
     if (user?.current_game_number) {
       return user.current_game_number
     }
-    
+
     return generateMockGameNumber()
   } catch (error) {
     console.error('❌ 获取游戏局号失败:', error)
@@ -328,7 +328,7 @@ const generateMockGameNumber = () => {
   const hour = String(now.getHours()).padStart(2, '0')
   const minute = String(now.getMinutes()).padStart(2, '0')
   const second = String(now.getSeconds()).padStart(2, '0')
-  
+
   return `${year}${month}${day}${hour}${minute}${second}`
 }
 
@@ -338,12 +338,12 @@ function debounce<T extends (...args: any[]) => any>(
   wait: number
 ): (...args: Parameters<T>) => void {
   let timeout: number | null = null
-  
+
   return (...args: Parameters<T>) => {
     if (timeout) {
       window.clearTimeout(timeout)
     }
-    
+
     timeout = window.setTimeout(() => {
       func(...args)
     }, wait)
@@ -375,10 +375,10 @@ const toggleSettings = () => {
 const handleRefreshBalance = async () => {
   try {
     if (isRefreshing.value) return
-    
+
     console.log('💰 开始刷新余额')
     isRefreshing.value = true
-    
+
     await refreshBalance()
     console.log('✅ 余额刷新完成')
   } catch (error) {
@@ -391,10 +391,10 @@ const handleRefreshBalance = async () => {
 const openBettingHistory = async () => {
   // 1. 关闭设置菜单
   showSettings.value = false
-  
+
   // 2. 检查数据是否需要刷新
   await bettingHistoryStore.forceRefresh() // 强制刷新
-  
+
   // 3. 显示弹窗
   showBettingHistory.value = true
 }
@@ -414,20 +414,20 @@ const handleBackgroundMusicToggle = debounce(async () => {
     console.log('🎵 背景音乐开关操作进行中，跳过')
     return
   }
-  
+
   try {
     isTogglingMusic.value = true
     console.log('🎵 用户切换背景音乐开关:', audioConfig.enableMusic ? '开启→关闭' : '关闭→开启')
-    
+
     // 🔥 直接调用 toggleMusic，它已经是暂停/恢复模式
     if (toggleMusic && typeof toggleMusic === 'function') {
       await toggleMusic()
     }
-    
+
     console.log('✅ 背景音乐开关切换完成:', audioConfig.enableMusic ? '已开启' : '已关闭')
   } catch (error) {
     console.error('❌ 背景音乐开关切换失败:', error)
-    
+
     // 错误时重置状态
     safeBgmEnabled.value = audioConfig.enableMusic
   } finally {
@@ -441,25 +441,25 @@ const handleSoundEffectsToggle = debounce(async () => {
     console.log('🔊 音效开关操作进行中，跳过')
     return
   }
-  
+
   try {
     isTogglingSfx.value = true
     console.log('🔊 用户切换音效开关:', audioConfig.enableSfx ? '开启→关闭' : '关闭→开启')
-    
+
     // 🔥 修改：调用 toggleSfx 并等待完成
     if (toggleSfx && typeof toggleSfx === 'function') {
       await toggleSfx()
     }
-    
+
     console.log('✅ 音效开关切换完成:', audioConfig.enableSfx ? '已开启' : '已关闭')
-    
+
     // 🔥 新增：验证状态是否正确更新
     const sfxStatus = getSfxStatus()
     console.log('🔍 音效状态验证:', sfxStatus)
-    
+
   } catch (error) {
     console.error('❌ 音效开关切换失败:', error)
-    
+
     // 🔥 新增：错误时重置状态
     safeSfxEnabled.value = audioConfig.enableSfx
   } finally {
@@ -477,15 +477,15 @@ const handleAudioRetry = async () => {
   try {
     isRetryingAudio.value = true
     console.log('🔄 用户手动重试音频初始化')
-    
+
     const audioInfo = getAudioInfo()
     console.log('🔍 当前音频状态:', audioInfo)
-    
+
     // 尝试重新解锁音频
     if (!canPlayAudio.value && unlockAudioContext) {
       await unlockAudioContext()
     }
-    
+
   } catch (error) {
     console.error('❌ 音频重试失败:', error)
   } finally {
@@ -559,7 +559,7 @@ const monitorAudioState = () => {
     if (audioContext.backgroundMusicInstance) {
       const isPlaying = !audioContext.backgroundMusicInstance.paused
       const shouldBePlaying = audioConfig.enableMusic && !audioContext.isBgmUserPaused
-      
+
       if (isPlaying !== shouldBePlaying) {
         console.log('⚠️ 背景音乐状态不一致:', {
           isPlaying,
@@ -569,12 +569,12 @@ const monitorAudioState = () => {
         })
       }
     }
-    
+
     // 🔥 新增：检查音效状态
     try {
       const sfxStatus = getSfxStatus()
       const currentSfxState = audioConfig.enableSfx
-      
+
       if (sfxStatus.enabled !== currentSfxState) {
         console.log('⚠️ 音效状态不一致:', {
           sfxStatusEnabled: sfxStatus.enabled,
@@ -585,7 +585,7 @@ const monitorAudioState = () => {
       console.warn('⚠️ 音效状态检查失败:', error)
     }
   }, 5000) // 每5秒检查一次
-  
+
   return checkInterval
 }
 
@@ -593,7 +593,7 @@ const monitorAudioState = () => {
 onMounted(async () => {
   try {
     console.log('🔧 TopToolbar 组件已挂载')
-    
+
     // 加载音频配置
     if (loadAudioConfig && typeof loadAudioConfig === 'function') {
       try {
@@ -603,7 +603,7 @@ onMounted(async () => {
         console.warn('⚠️ 音频配置加载失败:', error)
       }
     }
-    
+
     // 监听余额更新事件
     if (onBalanceUpdate && typeof onBalanceUpdate === 'function') {
       try {
@@ -615,7 +615,7 @@ onMounted(async () => {
         console.warn('⚠️ 余额更新监听设置失败:', error)
       }
     }
-    
+
     // 初始化投注记录store
     try {
       console.log('🎯 初始化投注记录store')
@@ -624,17 +624,17 @@ onMounted(async () => {
     } catch (error) {
       console.warn('⚠️ 投注记录store初始化失败:', error)
     }
-    
+
     // 🔥 修改：开始监听音频状态（包含音效）
     const stateMonitor = monitorAudioState()
     ;(window as any).__audioStateMonitor = stateMonitor
-    
+
     // 添加事件监听器
     document.addEventListener('click', handleClickOutside)
     document.addEventListener('keydown', handleKeydown)
-    
+
     console.log('✅ TopToolbar 初始化完成')
-    
+
     // 输出当前状态用于调试
     console.log('📊 当前真实数据状态:')
     console.log('  - 桌台信息:', tableInfo?.value)
@@ -652,7 +652,7 @@ onMounted(async () => {
     console.log('    * 投注限额:', safeBetLimits.value)
     console.log('    * 游戏局号:', safeGameNumber.value)
     console.log('    * 用户余额:', safeBalance.value)
-    
+
   } catch (error) {
     console.error('❌ TopToolbar 挂载时发生错误:', error)
   }
@@ -665,7 +665,7 @@ onUnmounted(() => {
       window.clearInterval((window as any).__audioStateMonitor)
       delete (window as any).__audioStateMonitor
     }
-    
+
     document.removeEventListener('click', handleClickOutside)
     document.removeEventListener('keydown', handleKeydown)
     console.log('🔧 TopToolbar 组件已卸载')
@@ -1019,44 +1019,44 @@ input:checked + .slider:before {
   .top-toolbar {
     height: 36px;
   }
-  
+
   .left-section {
     height: 36px;
     padding: 0 10px;
     min-width: 160px;
   }
-  
+
   .right-section {
     height: 36px;
     padding: 0 10px;
   }
-  
+
   .back-btn {
     height: 24px;
     min-width: 28px;
     font-size: 12px;
   }
-  
+
   .settings-btn {
     width: 24px;
     height: 24px;
   }
-  
+
   .retry-btn {
     width: 20px;
     height: 20px;
     font-size: 10px;
   }
-  
+
   .info-section {
     gap: 1px;
   }
-  
+
   .game-number,
   .balance-amount {
     font-size: 10px;
   }
-  
+
   .info-label {
     font-size: 9px;
     min-width: 20px;
@@ -1068,19 +1068,19 @@ input:checked + .slider:before {
     gap: 8px;
     min-width: 140px;
   }
-  
+
   .right-section {
     gap: 6px;
   }
-  
+
   .table-name {
     font-size: 12px;
   }
-  
+
   .bet-limits {
     font-size: 9px;
   }
-  
+
   .dropdown-menu {
     min-width: 160px;
     right: -10px;

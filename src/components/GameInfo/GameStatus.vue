@@ -7,7 +7,7 @@
         <div class="status-dot"></div>
         <span class="status-text">{{ statusText }}</span>
       </div>
-      
+
       <!-- 倒计时 - 只在有倒计时时显示 -->
       <div class="countdown" v-if="gameState.countdown > 0">
         <div class="countdown-container">
@@ -38,7 +38,7 @@
             />
           </svg>
           <div class="countdown-content">
-            <span 
+            <span
               class="countdown-number"
               :class="{ 'countdown-urgent': gameState.countdown <= 5 }"
             >
@@ -55,7 +55,7 @@
 import { computed, reactive, onMounted, onUnmounted } from 'vue'
 import { NConfigProvider } from 'naive-ui'
 import { useWebSocketEvents } from '@/composables/useWebSocketEvents'
-import { useAudio } from '@/composables/useAudio'  // 🔥 修改：使用简化后的音频系统
+import { useAudio } from '@/services/Audio'  // 🔥 修改：使用简化后的音频系统
 import { useBettingStore } from '@/stores/bettingStore'  // 🔥 新增：引入投注状态管理
 import type { CountdownData, GameResultData, GameStatusData } from '@/types/api'
 // 在 GameStatus.vue 的 <script setup> 开头添加
@@ -99,20 +99,20 @@ const gameState = reactive({
 })
 
 // 🔥 修改：集成简化后的音频功能
-const { 
-  playBetStartSound, 
-  playBetStopSound, 
-  canPlayAudio 
+const {
+  playBetStartSound,
+  playBetStopSound,
+  canPlayAudio
 } = useAudio()
 
 // 🔥 新增：引入投注状态管理
 const bettingStore = useBettingStore()
 
 // WebSocket 事件监听
-const { 
-  onCountdown, 
-  onGameResult, 
-  onGameStatus, 
+const {
+  onCountdown,
+  onGameResult,
+  onGameStatus,
   onError
 } = useWebSocketEvents()
 
@@ -208,50 +208,50 @@ const safePlayBetStopSound = async () => {
 // 修改 handleCountdown 函数
 const handleCountdown = (data: CountdownData) => {
   console.log('🎯 GameStatus 收到倒计时事件:', data)
-  
+
   // 🔥 位置1：检测新局并自动清场 + 刷新余额
-  if (data.game_number && 
-      data.game_number !== gameState.lastGameNumber && 
+  if (data.game_number &&
+      data.game_number !== gameState.lastGameNumber &&
       gameState.lastGameNumber !== '') {
-    
+
     console.log('🆕 检测到新局开始:', {
       新局编号: data.game_number,
       上局编号: gameState.lastGameNumber,
       当前状态: data.status,
       倒计时: data.countdown
     })
-    
+
     // 执行自动清场
     bettingStore.clearAllBets()
-    
+
     // 🔥 新局开始时刷新余额
     safeRefreshBalance('新局开始')
-    
+
     console.log('🧹 新局自动清场完成')
   }
-  
+
   // 更新游戏编号记录
   if (data.game_number) {
     gameState.lastGameNumber = gameState.gameNumber
     gameState.gameNumber = data.game_number
   }
-  
+
   const previousCountdown = gameState.countdown
   const previousStatus = gameState.status
-  
+
   gameState.countdown = data.countdown
   gameState.lastUpdateTime = Date.now()
-  
+
   // 🔥 位置2：投注开始时刷新余额
   if (data.status === 'betting' && data.countdown > 0) {
     // 投注开始：从非投注状态进入投注状态，或者倒计时从0变为有值
     if (previousStatus !== 'betting' || (previousCountdown === 0 && data.countdown > 0)) {
       gameState.status = 'betting'
       safePlayBetStartSound()
-      
+
       // 🔥 投注开始时刷新余额
       safeRefreshBalance('投注开始')
-      
+
       console.log('🎵 投注阶段开始，播放开始音效，刷新余额')
     } else {
       // 投注进行中，只更新状态不播放音效
@@ -263,7 +263,7 @@ const handleCountdown = (data: CountdownData) => {
       safePlayBetStopSound()
       console.log('🎵 投注阶段结束，播放结束音效')
     }
-    
+
     gameState.status = 'dealing'
     gameState.countdown = 0
     clearTimers()
@@ -272,22 +272,22 @@ const handleCountdown = (data: CountdownData) => {
     gameState.countdown = 0
     clearTimers()
   }
-  
+
   // 更新上一次倒计时值
   gameState.lastCountdownValue = data.countdown
 }
 // 处理游戏结果事件
 const handleGameResult = (data: GameResultData) => {
   console.log('🎲 GameStatus 收到游戏结果:', data)
-  
+
   // 切换到结果状态
   gameState.status = 'result'
   gameState.countdown = 0
   gameState.gameNumber = data.game_number
   gameState.lastUpdateTime = Date.now()
-  
+
   clearTimers()
-  
+
   // 结果显示5秒后回到等待状态
   resultDisplayTimer = window.setTimeout(() => {
     if (gameState.status === 'result') {
@@ -300,7 +300,7 @@ const handleGameResult = (data: GameResultData) => {
 // 处理游戏状态事件（维护等）
 const handleGameStatus = (data: GameStatusData) => {
   console.log('🔧 GameStatus 收到状态事件:', data)
-  
+
   if (data.status === 'maintenance') {
     gameState.status = 'maintenance'
     gameState.countdown = 0
@@ -316,7 +316,7 @@ const handleError = (error: any) => {
 // 生命周期管理
 onMounted(() => {
   console.log('🎮 GameStatus 组件已挂载，开始监听 WebSocket 事件')
-  
+
   // 监听 WebSocket 事件
   onCountdown(handleCountdown)
   onGameResult(handleGameResult)
@@ -335,7 +335,7 @@ onMounted(() => {
 onUnmounted(() => {
   console.log('🎮 GameStatus 组件即将卸载，清理资源')
   clearTimers()
-  
+
   // WebSocket 事件监听器会在 useWebSocketEvents 中自动清理
 })
 </script>

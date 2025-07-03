@@ -9,7 +9,7 @@
         <div class="betting-container">
           <div class="betting-sections">
             <!-- 大小单双投注区域 -->
-            <MainBets 
+            <MainBets
               :selectedChip="selectedChip"
               :currentBets="currentBets"
               :confirmedBets="confirmedBets"
@@ -18,7 +18,7 @@
             />
 
             <!-- 点数投注区域 -->
-            <NumberBets 
+            <NumberBets
               :selectedChip="selectedChip"
               :currentBets="currentBets"
               :confirmedBets="confirmedBets"
@@ -89,14 +89,14 @@
     </div>
 
     <!-- 特效组件 -->
-    <WinningEffect 
+    <WinningEffect
       ref="winEffectRef"
       :show="false"
       :winAmount="0"
       :winType="'normal'"
       :duration="3000"
     />
-    <DiceRollingEffect 
+    <DiceRollingEffect
       ref="diceEffectRef"
       :show="false"
       :results="[1, 1, 1]"
@@ -110,7 +110,7 @@
 import type { ComponentPublicInstance } from 'vue'
 import { computed, onMounted, ref, nextTick } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
-import { useAudio } from '@/composables/useAudio'  // 🔥 修改：使用简化后的音频系统
+import { useAudio } from '@/services/Audio'  // 🔥 修改：使用简化后的音频系统
 import { useWebSocketEvents } from '@/composables/useWebSocketEvents'
 import { useGameData } from '@/composables/useGameData'
 import { useGameResults } from '@/composables/useGameResults'
@@ -141,10 +141,10 @@ const isDev = import.meta.env.DEV
 const bettingStore = useBettingStore()
 
 // 🔥 修改：使用简化后的音频系统
-const { 
-  playChipSelectSound, 
-  playChipPlaceSound, 
-  playBetConfirmSound, 
+const {
+  playChipSelectSound,
+  playChipPlaceSound,
+  playBetConfirmSound,
   playErrorSound,
   canPlayAudio
 } = useAudio()
@@ -219,7 +219,7 @@ const safePlaySound = async (soundFunction: () => Promise<boolean> | boolean) =>
 // 方法 - 筹码选择
 const selectChip = (value: number): void => {
   bettingStore.selectChip(value)
-  
+
   // 🔥 修改：安全播放音效
   safePlaySound(() => playChipSelectSound())
 }
@@ -227,7 +227,7 @@ const selectChip = (value: number): void => {
 // 方法 - 处理投注
 const handlePlaceBet = async (betType: string): Promise<void> => {
   const success = bettingStore.placeBet(betType as BetType, selectedChip.value)
-  
+
   if (success) {
     // 🔥 修改：安全播放音效
     safePlaySound(() => playChipPlaceSound())
@@ -279,7 +279,7 @@ const confirmBets = async (): Promise<void> => {
 onCountdown((data: CountdownData) => {
   const newPhase = data.status
   bettingStore.updateGamePhase(newPhase)
-  
+
   if (newPhase === 'betting') {
     if (bettingStore.bettingPhase === 'result') {
       bettingStore.updateBettingPhase('betting')
@@ -307,23 +307,23 @@ onError((error) => {
 // 🔥 修复：特效组件引用设置
 const setupEffectRefs = async () => {
   await nextTick() // 确保组件已渲染
-  
+
   console.log('🎯 设置特效组件引用:', {
     diceRef: diceEffectRef.value,
     winRef: winEffectRef.value,
     diceType: typeof diceEffectRef.value,
     winType: typeof winEffectRef.value
   })
-  
+
   // 传递组件引用
   setEffectRefs(diceEffectRef.value, winEffectRef.value)
-  
+
   // 🔥 开发模式下添加调试信息
   if (isDev) {
     console.log('🐛 特效组件详细信息:')
     console.log('- 开牌特效组件:', diceEffectRef.value)
     console.log('- 中奖特效组件:', winEffectRef.value)
-    
+
     // 暴露到全局用于调试
     ;(window as any).debugEffectRefs = {
       dice: diceEffectRef.value,
@@ -338,7 +338,7 @@ onMounted(async () => {
   if (!bettingStore.selectedChip || bettingStore.selectedChip <= 0) {
     bettingStore.selectedChip = 10
   }
-  
+
   // 如果已有用户信息，同步余额
   if (userInfo.value?.balance !== undefined) {
     bettingStore.updateBalance(userInfo.value.balance)
@@ -418,11 +418,11 @@ onMounted(async () => {
     margin: 0 8px;
     padding: 10px;
   }
-  
+
   .betting-sections {
     gap: 3px;
   }
-  
+
   .betting-content {
     padding-bottom: 110px;
     padding-top: 12px;
@@ -434,7 +434,7 @@ onMounted(async () => {
     padding-bottom: 110px;
     padding-top: 12px;
   }
-  
+
   .betting-sections {
     gap: 3px;
   }
@@ -445,12 +445,12 @@ onMounted(async () => {
   .bottom-fixed-area {
     position: relative;
   }
-  
+
   .betting-content {
     padding-bottom: 0;
     padding-top: 8px;
   }
-  
+
   .betting-sections {
     gap: 3px;
   }

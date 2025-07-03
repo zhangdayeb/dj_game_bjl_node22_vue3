@@ -4,7 +4,7 @@ import { useWebSocket } from './useWebSocket'
 import { initializeGameApi } from '@/services/gameApi'
 import { useBettingStore } from '@/stores/bettingStore'
 import { useGameStore } from '@/stores/gameStore'
-import { useAudio } from './useAudio' // 🔥 使用简化后的音频系统
+import { useAudio } from '../services/Audio' // 🔥 使用简化后的音频系统
 import { parseGameParams, validateGameParams, validateCurrentGameType } from '@/utils/urlParams'
 import { setGlobalWSService } from '@/services/websocket'
 import { ENV_CONFIG } from '@/utils/envUtils'
@@ -24,16 +24,16 @@ interface GameLifecycleInstance {
     websocket: boolean
     audio: boolean // 🔥 新增：音频初始化步骤
   }
-  
+
   wsService: any
-  
+
   initialize: () => Promise<void>
   reconnect: () => Promise<void>
   clearError: () => void
   cleanup: () => void
   updateUserInfo: (newUserInfo: any) => void
   updateTableInfo: (newTableInfo: any) => void
-  
+
   // 🔥 新增：音频相关方法
   getAudioStatus: () => any
   retryAudioInit: () => Promise<boolean>
@@ -51,11 +51,11 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
 
   const bettingStore = useBettingStore()
   const gameStore = useGameStore()
-  
+
   // 🔥 修改：使用暂停/恢复模式的音频系统
-  const { 
-    initializeAudio, 
-    unlockAudioContext, 
+  const {
+    initializeAudio,
+    unlockAudioContext,
     canPlayAudio,
     getAudioInfo,
     createBackgroundMusicInstance, // 🔥 新增：创建背景音乐实例
@@ -114,30 +114,30 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
   const initializeUrlParams = () => {
     const params = parseGameParams()
     const validation = validateGameParams(params)
-    
+
     if (!validation.isValid) {
       throw new Error(`URL参数无效: ${[...validation.missingParams, ...validation.errors].join(', ')}`)
     }
-    
+
     if (!skipGameTypeValidation) {
       const gameTypeValidation = validateCurrentGameType()
-      
+
       if (!gameTypeValidation.isValid && ENV_CONFIG.IS_PROD) {
         throw new Error(gameTypeValidation.error)
       }
     }
-    
+
     gameParams.value = params
     state.initSteps.urlParams = true
   }
 
   const initializeHttpApi = async () => {
     const apiResult = await initializeGameApi(gameParams.value)
-    
+
     state.tableInfo = apiResult.tableInfo
     state.userInfo = apiResult.userInfo
     state.initSteps.httpApi = true
-    
+
     // 新代码
     if (apiResult.tableInfo) {
       const { video_far, video_near } = apiResult.tableInfo
@@ -145,7 +145,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
         gameStore.updateVideoUrls(video_far, video_near)  // ✅ 使用新方法
       }
     }
-    
+
     return apiResult
   }
 
@@ -155,7 +155,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
       onConnected: () => {
         state.connectionStatus = 'connected'
         state.initSteps.websocket = true
-        
+
         // 🔥 修改：WebSocket连接成功后尝试创建背景音乐实例
         setTimeout(async () => {
           await prepareBackgroundMusicIfReady()
@@ -187,7 +187,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
       const checkConnection = () => {
         const wsConnected = wsService.value?.isConnected?.value === true
         const localConnected = state.connectionStatus === 'connected'
-        
+
         if (wsConnected || localConnected) {
           clearTimeout(timeout)
           resolve()
@@ -195,7 +195,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
           setTimeout(checkConnection, 100)
         }
       }
-      
+
       checkConnection()
     })
   }
@@ -209,7 +209,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
     }
 
     const now = Date.now()
-    
+
     // 检查冷却时间
     if (audioState.isRetrying && (now - audioState.lastInitTime) < audioState.initCooldown) {
       console.log('🔇 音频初始化冷却中，跳过')
@@ -229,10 +229,10 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
       audioState.isRetrying = true
 
       console.log(`🎵 开始音频系统初始化 (尝试 ${audioState.initAttempts}/${audioState.maxAttempts})...`)
-      
+
       // 🔥 修改：使用暂停/恢复模式的音频系统
       const initResult = await initializeAudio()
-      
+
       if (initResult) {
         console.log('✅ 音频系统初始化成功')
         state.initSteps.audio = true
@@ -240,25 +240,25 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
         return true
       } else {
         console.warn('⚠️ 音频系统初始化失败，但继续游戏初始化')
-        
+
         // 如果是最后一次尝试，也标记为完成
         if (audioState.initAttempts >= audioState.maxAttempts) {
           state.initSteps.audio = true
           audioState.isRetrying = false
         }
-        
+
         return false
       }
     } catch (error) {
       console.error(`❌ 音频系统初始化异常 (尝试 ${audioState.initAttempts}):`, error)
-      
+
       // 即使失败也在最后一次尝试后标记为完成
       if (audioState.initAttempts >= audioState.maxAttempts) {
         console.warn('🔇 音频系统初始化失败，但已达到最大尝试次数，标记为完成')
         state.initSteps.audio = true
         audioState.isRetrying = false
       }
-      
+
       return false
     }
   }
@@ -272,10 +272,10 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
 
     try {
       console.log('🔓 正在解锁音频上下文...')
-      
+
       // 🔥 修改：使用暂停/恢复模式的音频系统
       const unlockResult = await unlockAudioContext()
-      
+
       if (unlockResult) {
         console.log('✅ 音频上下文解锁成功')
         return true
@@ -304,24 +304,24 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
 
     try {
       console.log('🎵 检查游戏生命周期是否就绪以创建背景音乐实例...')
-      
+
       // 检查所有初始化步骤是否完成
-      const allStepsReady = state.initSteps.urlParams && 
-                           state.initSteps.httpApi && 
-                           state.initSteps.websocket && 
+      const allStepsReady = state.initSteps.urlParams &&
+                           state.initSteps.httpApi &&
+                           state.initSteps.websocket &&
                            state.initSteps.audio
-      
+
       if (allStepsReady && state.isInitialized && canPlayAudio.value) {
         console.log('🎵 游戏生命周期已就绪，创建背景音乐实例')
-        
+
         // 🔥 只创建实例，不立即播放
         const success = await createBackgroundMusicInstance()
-        
+
         if (success) {
           audioState.backgroundMusicCreated = true
           audioState.lastBgmOperation = 'instance_created'
           console.log('✅ 背景音乐实例创建成功（来自游戏生命周期）')
-          
+
           // 🔥 如果用户偏好是开启音乐且没有被用户暂停，则开始播放
           if (audioConfig.enableMusic && !audioContext.isBgmUserPaused) {
             setTimeout(async () => {
@@ -333,7 +333,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
               }
             }, 1000) // 延迟1秒确保实例稳定
           }
-          
+
           return true
         } else {
           console.log('❌ 背景音乐实例创建失败')
@@ -364,7 +364,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
 
     try {
       console.log('🎵 检查游戏生命周期是否就绪以启动背景音乐...')
-      
+
       // 🔥 修改：优先确保背景音乐实例已创建
       if (!audioState.backgroundMusicCreated) {
         console.log('🎵 背景音乐实例未创建，先尝试创建')
@@ -374,19 +374,19 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
           return false
         }
       }
-      
+
       // 检查所有初始化步骤是否完成
-      const allStepsReady = state.initSteps.urlParams && 
-                           state.initSteps.httpApi && 
-                           state.initSteps.websocket && 
+      const allStepsReady = state.initSteps.urlParams &&
+                           state.initSteps.httpApi &&
+                           state.initSteps.websocket &&
                            state.initSteps.audio
-      
+
       if (allStepsReady && state.isInitialized && canPlayAudio.value) {
         console.log('🎵 游戏生命周期已就绪，尝试启动背景音乐')
-        
+
         // 🔥 修改：使用暂停/恢复模式的播放方法
         const success = await startBackgroundMusicIfEnabled()
-        
+
         if (success) {
           audioState.backgroundMusicStarted = true
           audioState.lastBgmOperation = 'lifecycle_play_success'
@@ -421,7 +421,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
     }
 
     console.log('🔄 手动重试音频初始化...')
-    
+
     // 🔥 修改：重置所有音频相关状态
     audioState.initAttempts = 0
     audioState.isRetrying = false
@@ -429,7 +429,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
     audioState.backgroundMusicStarted = false // 🔥 重置背景音乐启动标志
     audioState.lastBgmOperation = 'manual_retry_init'
     state.initSteps.audio = false
-    
+
     const audioResult = await initializeAudioSystem()
     if (audioResult) {
       await unlockAudioContextSystem()
@@ -438,7 +438,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
         await prepareBackgroundMusicIfReady()
       }, 500)
     }
-    
+
     return audioResult
   }
 
@@ -497,15 +497,15 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
       // 步骤3：初始化WebSocket连接
       console.log('🔌 步骤3: 初始化WebSocket连接')
       await initializeWebSocketConnection()
-      
+
       // 🔥 步骤4：初始化音频系统（暂停/恢复模式）
       console.log('🎵 步骤4: 初始化音频系统')
       await initializeAudioSystem()
-      
+
       // 🔥 步骤5：解锁音频上下文（暂停/恢复模式）
       console.log('🔓 步骤5: 解锁音频上下文')
       await unlockAudioContextSystem()
-      
+
       // 步骤6：初始化游戏存储
       console.log('🎮 步骤6: 初始化游戏存储')
       initializeGameStores()
@@ -531,11 +531,11 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
   const reconnect = async (): Promise<void> => {
     try {
       state.connectionStatus = 'reconnecting'
-      
+
       if (wsService.value && typeof wsService.value.reconnect === 'function') {
         await wsService.value.reconnect()
       }
-      
+
       clearError()
     } catch (error: any) {
       setError(error)
@@ -545,14 +545,14 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
 
   const cleanup = (): void => {
     console.log('🧹 清理游戏生命周期资源...')
-    
+
     if (wsService.value && typeof wsService.value.disconnect === 'function') {
       wsService.value.disconnect()
     }
-    
+
     state.isInitialized = false
     state.connectionStatus = 'disconnected'
-    
+
     // 🔥 修改：重置初始化步骤（包含音频步骤）
     state.initSteps = {
       urlParams: false,
@@ -560,7 +560,7 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
       websocket: false,
       audio: false
     }
-    
+
     // 🔥 修改：重置音频状态
     audioState.initAttempts = 0
     audioState.isRetrying = false
@@ -578,16 +578,16 @@ export const createGameLifecycle = (options: GameLifecycleOptions = {}): GameLif
     get isLoading() { return state.isLoading },
     get error() { return state.error },
     get initSteps() { return state.initSteps },
-    
+
     get wsService() { return wsService.value },
-    
+
     initialize,
     reconnect,
     clearError,
     cleanup,
     updateUserInfo,
     updateTableInfo,
-    
+
     // 🔥 新增：音频相关方法
     getAudioStatus,
     retryAudioInit,
@@ -616,10 +616,10 @@ export const useGameLifecycle = (options: GameLifecycleOptions = {}) => {
         error: computed(() => globalLifecycleInstance!.error),
         initSteps: computed(() => globalLifecycleInstance!.initSteps)
       }),
-      
+
       // 🔥 修改：就绪状态检查（包含音频步骤）
-      isReady: computed(() => 
-        globalLifecycleInstance!.isInitialized && 
+      isReady: computed(() =>
+        globalLifecycleInstance!.isInitialized &&
         globalLifecycleInstance!.connectionStatus === 'connected' &&
         !globalLifecycleInstance!.error &&
         globalLifecycleInstance!.initSteps.urlParams &&
@@ -627,21 +627,21 @@ export const useGameLifecycle = (options: GameLifecycleOptions = {}) => {
         globalLifecycleInstance!.initSteps.websocket &&
         globalLifecycleInstance!.initSteps.audio // 🔥 新增音频步骤检查
       ),
-      
+
       initialize: globalLifecycleInstance.initialize,
       reconnect: globalLifecycleInstance.reconnect,
       clearError: globalLifecycleInstance.clearError,
       cleanup: globalLifecycleInstance.cleanup,
-      
+
       // 🔥 新增：音频相关方法
       getAudioStatus: globalLifecycleInstance.getAudioStatus,
       retryAudioInit: globalLifecycleInstance.retryAudioInit,
       startBackgroundMusicIfReady: globalLifecycleInstance.startBackgroundMusicIfReady // 🔥 新增方法
     }
   }
-  
+
   globalLifecycleInstance = createGameLifecycle(options)
-  
+
   return {
     lifecycleState: readonly({
       tableInfo: computed(() => globalLifecycleInstance!.tableInfo),
@@ -652,10 +652,10 @@ export const useGameLifecycle = (options: GameLifecycleOptions = {}) => {
       error: computed(() => globalLifecycleInstance!.error),
       initSteps: computed(() => globalLifecycleInstance!.initSteps)
     }),
-    
+
     // 🔥 修改：就绪状态检查（包含音频步骤）
-    isReady: computed(() => 
-      globalLifecycleInstance!.isInitialized && 
+    isReady: computed(() =>
+      globalLifecycleInstance!.isInitialized &&
       globalLifecycleInstance!.connectionStatus === 'connected' &&
       !globalLifecycleInstance!.error &&
       globalLifecycleInstance!.initSteps.urlParams &&
@@ -663,12 +663,12 @@ export const useGameLifecycle = (options: GameLifecycleOptions = {}) => {
       globalLifecycleInstance!.initSteps.websocket &&
       globalLifecycleInstance!.initSteps.audio // 🔥 新增音频步骤检查
     ),
-    
+
     initialize: globalLifecycleInstance.initialize,
     reconnect: globalLifecycleInstance.reconnect,
     clearError: globalLifecycleInstance.clearError,
     cleanup: globalLifecycleInstance.cleanup,
-    
+
     // 🔥 新增：音频相关方法
     getAudioStatus: globalLifecycleInstance.getAudioStatus,
     retryAudioInit: globalLifecycleInstance.retryAudioInit,

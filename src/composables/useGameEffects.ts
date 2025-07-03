@@ -1,6 +1,6 @@
 // src/composables/useGameEffects.ts - 配合简化音频系统的调整版本
 import { ref, computed, reactive, watch, readonly } from 'vue'
-import { useAudio } from './useAudio' // 🔥 使用简化后的音频系统
+import { useAudio } from '../services/Audio' // 🔥 使用简化后的音频系统
 import type { ComponentPublicInstance } from 'vue'
 
 export interface EffectConfig {

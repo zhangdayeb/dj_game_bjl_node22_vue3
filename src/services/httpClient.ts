@@ -18,8 +18,8 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
 
 // 默认配置
 const defaultConfig: ApiConfig = {
-  baseURL: getEnvVar('VITE_API_BASE_URL', 'https://bjlapi.ampj998.top'),
-  wsURL: getEnvVar('VITE_WS_URL', 'wss://wssbjl.ampj998.top'),
+  baseURL: getEnvVar('VITE_API_BASE_URL', 'https://bjlapi.oyfeit8.com'),
+  wsURL: getEnvVar('VITE_WS_URL', 'wss://wssbjl.oyfeit8.com'),
   timeout: 10000,
   retryAttempts: 3,
   retryDelay: 1000

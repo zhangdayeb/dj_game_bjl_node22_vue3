@@ -58,7 +58,7 @@ export class GameWebSocketService {
   }
 
   private buildWSURL(): string {
-    const baseURL = import.meta.env.VITE_WS_URL || 'wss://wssbjl.ampj998.top'
+    const baseURL = import.meta.env.VITE_WS_URL || 'wss://wssbjl.oyfeit8.com'
     return baseURL
   }
 

@@ -1,10 +1,12 @@
-// 🔥 极简版音频系统 - 背景音乐暂停/恢复模式
+// 🎵 基于 Howler.js 的音频系统 - 完全重构版
 import { ref, computed, reactive, readonly } from 'vue'
+import { Howl, Howler } from 'howler'
 
 // 全局单例状态
 let audioSystemInstance: ReturnType<typeof createAudioSystem> | null = null
 let isGlobalInitialized = false
 
+// 🎯 音频配置接口
 export interface AudioConfig {
   masterVolume: number
   sfxVolume: number
@@ -14,32 +16,67 @@ export interface AudioConfig {
   enableVibration: boolean
 }
 
+// 🎯 音效定义接口
 export interface SoundDefinition {
   id: string
-  url: string
+  filename: string // 只需要文件名，不含扩展名
   volume?: number
   loop?: boolean
   category: 'sfx' | 'music'
+  formats?: string[] // 支持的格式，默认 ['mp3', 'wav']
 }
 
-export interface AudioContextState {
-  isUnlocked: boolean
+// 🎯 音频系统状态
+export interface AudioSystemState {
+  isInitialized: boolean
   isSupported: boolean
-  // 🔥 新增：背景音乐专用状态管理
-  backgroundMusicInstance: HTMLAudioElement | null
-  isBgmUserPaused: boolean  // 用户是否主动暂停
-  bgmPlayPosition: number   // 播放位置记录
-  bgmCreatedTime: number    // 实例创建时间
-  bgmLastOperation: string  // 最后一次操作类型
-  // 保留兼容性
-  currentBackgroundMusic: HTMLAudioElement | null
+  isUnlocked: boolean
+  backgroundMusicId: string | null
+  backgroundMusicPosition: number
+  isBgmUserPaused: boolean
+  sfxQueueLength: number
+  lastOperation: string
+  errorCount: number
 }
 
-// 🔥 核心音频系统创建函数
-function createAudioSystem() {
-  console.log('🎵 创建音频系统实例（暂停/恢复模式）')
+// 🎯 音效播放选项
+export interface PlaySoundOptions {
+  volume?: number
+  loop?: boolean
+  interrupt?: boolean
+  fade?: { duration: number; from?: number; to?: number }
+  onEnd?: () => void
+  onPlay?: () => void
+  onError?: (error: any) => void
+}
 
-  // 音效配置
+// 🎯 音效队列项
+interface SfxQueueItem {
+  id: string
+  howl: Howl
+  options: PlaySoundOptions
+  timestamp: number
+  priority: number
+}
+
+// 🎯 iOS Safari 兼容性检测
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+const isIOSSafari = isIOS && isSafari
+
+// 🎯 音频文件路径管理 - iOS优化
+const AUDIO_BASE_PATH = '/src/assets/audio'
+const DEFAULT_FORMATS = isIOSSafari ? ['mp3'] : ['mp3', 'wav'] // iOS Safari 优先MP3
+
+const getAudioSources = (filename: string, formats: string[] = DEFAULT_FORMATS): string[] => {
+  return formats.map(format => `${AUDIO_BASE_PATH}/${filename}.${format}`)
+}
+
+// 🎯 核心音频系统创建函数
+function createAudioSystem() {
+  console.log('🎵 创建基于 Howler.js 的音频系统实例')
+
+  // 音频配置
   const config = reactive<AudioConfig>({
     masterVolume: 0.8,
     sfxVolume: 0.7,
@@ -49,104 +86,170 @@ function createAudioSystem() {
     enableVibration: true
   })
 
-  // 音效定义 - 简化版本
+  // 系统状态 - iOS Safari 优化
+  const state = reactive<AudioSystemState>({
+    isInitialized: false,
+    isSupported: true,
+    isUnlocked: false,
+    backgroundMusicId: null,
+    backgroundMusicPosition: 0,
+    isBgmUserPaused: false,
+    sfxQueueLength: 0,
+    lastOperation: 'none',
+    errorCount: 0
+  })
+
+  // 🎯 iOS Safari 特殊状态管理
+  const iosState = reactive({
+    hasUserInteracted: false,
+    isPlayingSfx: false,
+    backgroundMusicPausedForSfx: false,
+    currentSfxId: null as string | null
+  })
+
+  // 音效实例缓存 - iOS Safari 限制缓存大小
+  const soundCache = new Map<string, Howl>()
+  const backgroundMusicCache = new Map<string, Howl>()
+  const maxCacheSize = isIOSSafari ? 5 : 20 // iOS Safari 限制缓存
+
+  // 音效播放队列 - iOS Safari 单个播放
+  const sfxQueue = reactive<SfxQueueItem[]>([])
+  let isProcessingQueue = false
+
+  // 🎯 预定义音效库 - 百家乐音效系统
   const soundDefinitions: Record<string, SoundDefinition> = {
-    // UI 音效
-    'click': { id: 'click', url: '/audio/chip-select.mp3', category: 'sfx', volume: 0.6 },
-    'error': { id: 'error', url: '/audio/error.mp3', category: 'sfx', volume: 0.8 },
-    'success': { id: 'success', url: '/audio/bet-confirm.mp3', category: 'sfx', volume: 0.7 },
+    // 庄家音效
+    'banker0': { id: 'banker0', filename: 'banker0', category: 'sfx', volume: 0.8 },
+    'banker1': { id: 'banker1', filename: 'banker1', category: 'sfx', volume: 0.8 },
+    'banker2': { id: 'banker2', filename: 'banker2', category: 'sfx', volume: 0.8 },
+    'banker3': { id: 'banker3', filename: 'banker3', category: 'sfx', volume: 0.8 },
+    'banker4': { id: 'banker4', filename: 'banker4', category: 'sfx', volume: 0.8 },
+    'banker5': { id: 'banker5', filename: 'banker5', category: 'sfx', volume: 0.8 },
+    'banker6': { id: 'banker6', filename: 'banker6', category: 'sfx', volume: 0.8 },
+    'banker7': { id: 'banker7', filename: 'banker7', category: 'sfx', volume: 0.8 },
+    'banker8': { id: 'banker8', filename: 'banker8', category: 'sfx', volume: 0.8 },
+    'banker9': { id: 'banker9', filename: 'banker9', category: 'sfx', volume: 0.8 },
+    'bankerWin': { id: 'bankerWin', filename: 'bankerWin', category: 'sfx', volume: 0.8 },
 
-    // 筹码音效
-    'chip-select': { id: 'chip-select', url: '/audio/chip-select.mp3', category: 'sfx', volume: 0.7 },
-    'chip-place': { id: 'chip-place', url: '/audio/chip-place.mp3', category: 'sfx', volume: 0.8 },
+    // 游戏控制音效
+    'bet': { id: 'bet', filename: 'bet', category: 'sfx', volume: 0.7 },
+    'betSound': { id: 'betSound', filename: 'betSound', category: 'sfx', volume: 0.7 },
+    'betSuccess': { id: 'betSuccess', filename: 'betSuccess', category: 'sfx', volume: 0.7 },
+    'bg': { id: 'bg', filename: 'bg', category: 'sfx', volume: 0.6 },
+    'bigWin': { id: 'bigWin', filename: 'bigWin', category: 'sfx', volume: 0.9 },
+    'celebration': { id: 'celebration', filename: 'celebration', category: 'sfx', volume: 0.8 },
+    'coin': { id: 'coin', filename: 'coin', category: 'sfx', volume: 0.7 },
+    'error': { id: 'error', filename: 'error', category: 'sfx', volume: 0.8 },
+    'jackpot': { id: 'jackpot', filename: 'jackpot', category: 'sfx', volume: 1.0 },
 
-    // 游戏音效
-    'bet-confirm': { id: 'bet-confirm', url: '/audio/bet-confirm.mp3', category: 'sfx', volume: 0.9 },
-    'dice-roll': { id: 'dice-roll', url: '/audio/dice-roll.mp3', category: 'sfx', volume: 0.7 },
-    'bet-start': { id: 'bet-start', url: '/audio/bet-start.mp3', category: 'sfx', volume: 0.9 },
-    'bet-stop': { id: 'bet-stop', url: '/audio/bet-stop.mp3', category: 'sfx', volume: 0.9 },
-    'win': { id: 'win', url: '/audio/win.mp3', category: 'sfx', volume: 1.0 },
+    // 开牌语音
+    'OPENCARD': { id: 'OPENCARD', filename: 'OPENCARD', category: 'sfx', volume: 0.8 },
 
-    // 🔥 新增：开牌语音
-    'dice-kai': { id: 'dice-kai', url: '/audio/open/kai.mp3', category: 'sfx', volume: 0.8 },
-    'dice-1': { id: 'dice-1', url: '/audio/open/1.mp3', category: 'sfx', volume: 0.8 },
-    'dice-2': { id: 'dice-2', url: '/audio/open/2.mp3', category: 'sfx', volume: 0.8 },
-    'dice-3': { id: 'dice-3', url: '/audio/open/3.mp3', category: 'sfx', volume: 0.8 },
-    'dice-4': { id: 'dice-4', url: '/audio/open/4.mp3', category: 'sfx', volume: 0.8 },
-    'dice-5': { id: 'dice-5', url: '/audio/open/5.mp3', category: 'sfx', volume: 0.8 },
-    'dice-6': { id: 'dice-6', url: '/audio/open/6.mp3', category: 'sfx', volume: 0.8 },
-    'dice-big': { id: 'dice-big', url: '/audio/open/big.mp3', category: 'sfx', volume: 0.8 },
-    'dice-small': { id: 'dice-small', url: '/audio/open/small.mp3', category: 'sfx', volume: 0.8 },
-    'dice-dan': { id: 'dice-dan', url: '/audio/open/dan.mp3', category: 'sfx', volume: 0.8 },
-    'dice-shuang': { id: 'dice-shuang', url: '/audio/open/shuang.mp3', category: 'sfx', volume: 0.8 },
+    // 玩家音效
+    'player0': { id: 'player0', filename: 'player0', category: 'sfx', volume: 0.8 },
+    'player1': { id: 'player1', filename: 'player1', category: 'sfx', volume: 0.8 },
+    'player2': { id: 'player2', filename: 'player2', category: 'sfx', volume: 0.8 },
+    'player3': { id: 'player3', filename: 'player3', category: 'sfx', volume: 0.8 },
+    'player4': { id: 'player4', filename: 'player4', category: 'sfx', volume: 0.8 },
+    'player5': { id: 'player5', filename: 'player5', category: 'sfx', volume: 0.8 },
+    'player6': { id: 'player6', filename: 'player6', category: 'sfx', volume: 0.8 },
+    'player7': { id: 'player7', filename: 'player7', category: 'sfx', volume: 0.8 },
+    'player8': { id: 'player8', filename: 'player8', category: 'sfx', volume: 0.8 },
+    'player9': { id: 'player9', filename: 'player9', category: 'sfx', volume: 0.8 },
+    'playerWin': { id: 'playerWin', filename: 'playerWin', category: 'sfx', volume: 0.8 },
+
+    // 游戏状态音效
+    'stop': { id: 'stop', filename: 'stop', category: 'sfx', volume: 0.7 },
+    'tie': { id: 'tie', filename: 'tie', category: 'sfx', volume: 0.8 },
+    'welcome': { id: 'welcome', filename: 'welcome', category: 'sfx', volume: 0.8 },
+    'win': { id: 'win', filename: 'win', category: 'sfx', volume: 0.9 },
 
     // 背景音乐
-    'bg001': { id: 'bg001', url: '/audio/bg001.mp3', category: 'music', volume: 0.7, loop: true }
+    'background': { id: 'background', filename: 'bg', category: 'music', volume: 0.4, loop: true }
   }
 
-  // 🔥 扩展的音频上下文
-  const audioContext = reactive<AudioContextState>({
-    isUnlocked: false,
-    isSupported: true,
-    // 新的背景音乐状态管理
-    backgroundMusicInstance: null,
-    isBgmUserPaused: false,
-    bgmPlayPosition: 0,
-    bgmCreatedTime: 0,
-    bgmLastOperation: 'none',
-    // 保留兼容性
-    currentBackgroundMusic: null
-  })
-
-  // 状态
-  const isInitialized = ref(false)
-
-  // 计算属性
+  // 🎯 计算属性 - iOS Safari 优化
   const canPlayAudio = computed(() => {
-    return audioContext.isSupported && audioContext.isUnlocked && isInitialized.value
+    return state.isSupported && state.isUnlocked && state.isInitialized &&
+           (isIOSSafari ? iosState.hasUserInteracted : true)
   })
 
-  const effectiveVolume = computed(() => ({
-    sfx: config.enableSfx ? config.masterVolume * config.sfxVolume : 0,
-    music: config.enableMusic ? config.masterVolume * config.musicVolume : 0
-  }))
+  const effectiveVolume = computed(() => {
+    // iOS Safari 音量调整
+    const volumeMultiplier = isIOSSafari ? 0.8 : 1.0
+    return {
+      sfx: config.enableSfx ? config.masterVolume * config.sfxVolume * volumeMultiplier : 0,
+      music: config.enableMusic ? config.masterVolume * config.musicVolume * volumeMultiplier : 0
+    }
+  })
 
-  // 🔥 背景音乐实例是否正在播放
   const isBackgroundMusicPlaying = computed(() => {
-    return audioContext.backgroundMusicInstance &&
-           !audioContext.backgroundMusicInstance.paused &&
-           !audioContext.isBgmUserPaused
+    if (!state.backgroundMusicId) return false
+    const bgMusic = backgroundMusicCache.get(state.backgroundMusicId)
+    return bgMusic && bgMusic.playing() && !state.isBgmUserPaused
   })
 
-  // 🔥 初始化音频系统
+  // 🎯 初始化音频系统 - iOS Safari 优化
   const initializeAudio = async (): Promise<boolean> => {
-    if (isInitialized.value) {
+    if (state.isInitialized) {
       console.log('🎵 音频系统已初始化，跳过重复初始化')
       return true
     }
 
     try {
-      console.log('🎵 开始初始化音频系统（暂停/恢复模式）...')
+      console.log('🎵 开始初始化 Howler.js 音频系统...', isIOSSafari ? '(iOS Safari模式)' : '')
 
-      if (typeof Audio === 'undefined') {
-        audioContext.isSupported = false
-        console.error('❌ 浏览器不支持 Audio API')
+      // 检查 Howler.js 是否可用
+      if (typeof Howler === 'undefined') {
+        console.error('❌ Howler.js 未加载')
+        state.isSupported = false
         return false
       }
 
-      isInitialized.value = true
-      console.log('✅ 音频系统初始化完成（暂停/恢复模式）')
+      // 设置全局 Howler 配置
+      Howler.volume(config.masterVolume)
+
+      // iOS Safari 不支持音频池，跳过设置
+      if (!isIOSSafari) {
+        try {
+          if ('html5PoolSize' in Howler) {
+            (Howler as any).html5PoolSize = 10
+          }
+        } catch (e) {
+          console.warn('⚠️ 无法设置HTML5音频池大小，跳过')
+        }
+      }
+
+      // 🎯 iOS Safari 用户交互检测
+      if (isIOSSafari) {
+        const enableUserInteraction = () => {
+          iosState.hasUserInteracted = true
+          console.log('✅ iOS Safari 用户交互已激活')
+        }
+
+        // 监听用户交互事件
+        document.addEventListener('touchstart', enableUserInteraction, { once: true })
+        document.addEventListener('touchend', enableUserInteraction, { once: true })
+        document.addEventListener('click', enableUserInteraction, { once: true })
+
+        console.log('🎯 iOS Safari 等待用户交互...')
+      }
+
+      state.isInitialized = true
+      state.lastOperation = 'initialized'
+      console.log('✅ Howler.js 音频系统初始化完成', isIOSSafari ? '(iOS Safari模式)' : '')
       return true
     } catch (error) {
       console.error('❌ 音频系统初始化失败:', error)
-      audioContext.isSupported = false
+      state.isSupported = false
+      state.errorCount++
       return false
     }
   }
 
-  // 解锁音频上下文
+  // 🎯 解锁音频上下文
   const unlockAudioContext = async (): Promise<boolean> => {
-    if (audioContext.isUnlocked) {
+    if (state.isUnlocked) {
       console.log('🎵 音频上下文已解锁，跳过重复解锁')
       return true
     }
@@ -154,383 +257,370 @@ function createAudioSystem() {
     try {
       console.log('🔓 正在解锁音频上下文...')
 
-      const silentAudio = new Audio('/audio/chip-select.mp3')
-      silentAudio.volume = 0
-      silentAudio.muted = true
+      // 使用 Howler.js 解锁音频上下文
+      const unlockResult = await new Promise<boolean>((resolve) => {
+        // 创建一个静音音频进行解锁
+        const unlockSound = new Howl({
+          src: getAudioSources('chip-select'),
+          volume: 0,
+          preload: false,
+          onload: () => {
+            unlockSound.play()
+            unlockSound.stop()
+            unlockSound.unload()
+            resolve(true)
+          },
+          onloaderror: () => {
+            resolve(true) // 即使失败也继续，不阻塞游戏
+          }
+        })
 
-      try {
-        await silentAudio.play()
-        silentAudio.pause()
-        silentAudio.currentTime = 0
-      } catch (e) {
-        // 忽略播放失败
-      }
+        // 超时保护
+        setTimeout(() => resolve(true), 2000)
+      })
 
-      audioContext.isUnlocked = true
+      state.isUnlocked = unlockResult
+      state.lastOperation = 'unlocked'
       console.log('✅ 音频上下文解锁成功')
       return true
     } catch (error) {
       console.warn('⚠️ 音频上下文解锁失败:', error)
-      audioContext.isUnlocked = true
+      state.isUnlocked = true // 静默处理，不阻塞游戏
+      state.errorCount++
       return true
     }
   }
 
-  // 🔥 新增：创建背景音乐实例（只在首次需要时创建）
-  const createBackgroundMusicInstance = async (): Promise<boolean> => {
-    if (audioContext.backgroundMusicInstance) {
-      console.log('🎵 背景音乐实例已存在，跳过创建')
-      return true
-    }
+  // 🎯 创建音效实例
+  const createSoundInstance = (definition: SoundDefinition): Howl => {
+    const sources = getAudioSources(definition.filename, definition.formats)
+
+    return new Howl({
+      src: sources,
+      volume: definition.volume || 1.0,
+      loop: definition.loop || false,
+      preload: false, // 按需加载
+      onload: () => {
+        console.log(`🎵 音效加载成功: ${definition.id}`)
+      },
+      onloaderror: () => {
+        console.error(`❌ 音效加载失败: ${definition.id}`)
+        state.errorCount++
+      },
+      onplay: () => {
+        console.log(`🎵 音效播放开始: ${definition.id}`)
+      },
+      onend: () => {
+        console.log(`🎵 音效播放结束: ${definition.id}`)
+      },
+      onplayerror: () => {
+        console.error(`❌ 音效播放错误: ${definition.id}`)
+        state.errorCount++
+      }
+    })
+  }
+
+  // 🎯 处理音效队列
+  const processQueue = async (): Promise<void> => {
+    if (isProcessingQueue || sfxQueue.length === 0) return
+
+    isProcessingQueue = true
+    state.sfxQueueLength = sfxQueue.length
 
     try {
-      console.log('🎵 创建背景音乐实例...')
+      while (sfxQueue.length > 0) {
+        const item = sfxQueue.shift()!
 
-      const soundDef = soundDefinitions['bg001']
-      if (!soundDef) {
-        console.error('❌ 背景音乐定义不存在')
-        return false
-      }
+        // 应用音量设置
+        const finalVolume = (item.options.volume || 1.0) * effectiveVolume.value.sfx
+        item.howl.volume(finalVolume)
 
-      const audio = new Audio(soundDef.url)
-      audio.loop = true
-      audio.preload = 'auto'
+        // 播放音效
+        await new Promise<void>((resolve) => {
+          const onEnd = () => {
+            resolve()
+          }
 
-      // 设置音量
-      const volume = effectiveVolume.value.music
-      audio.volume = volume
+          const onStop = () => {
+            resolve()
+          }
 
-      // 绑定事件监听器
-      audio.addEventListener('ended', () => {
-        console.log('🎵 背景音乐播放结束')
-      })
+          item.howl.once('end', onEnd)
+          item.howl.once('stop', onStop)
 
-      audio.addEventListener('error', (e) => {
-        console.error('❌ 背景音乐播放错误:', e)
-        // 标记需要重新创建
-        audioContext.backgroundMusicInstance = null
-      })
+          // 播放音效
+          item.howl.play()
 
-      audio.addEventListener('loadstart', () => {
-        console.log('🎵 背景音乐开始加载')
-      })
+          // 如果不是循环音效，设置超时保护
+          if (!item.howl.loop()) {
+            setTimeout(() => {
+              resolve()
+            }, 5000) // 5秒超时
+          }
+        })
 
-      audio.addEventListener('canplaythrough', () => {
-        console.log('🎵 背景音乐加载完成，可以播放')
-      })
-
-      audioContext.backgroundMusicInstance = audio
-      audioContext.currentBackgroundMusic = audio // 保持兼容性
-      audioContext.bgmCreatedTime = Date.now()
-      audioContext.bgmLastOperation = 'created'
-
-      console.log('✅ 背景音乐实例创建成功')
-      return true
-    } catch (error) {
-      console.error('❌ 创建背景音乐实例失败:', error)
-      return false
-    }
-  }
-
-  // 🔥 新增：销毁背景音乐实例
-  const destroyBackgroundMusicInstance = (): void => {
-    if (audioContext.backgroundMusicInstance) {
-      console.log('🎵 销毁背景音乐实例')
-
-      // 保存当前播放位置
-      if (!audioContext.backgroundMusicInstance.paused) {
-        audioContext.bgmPlayPosition = audioContext.backgroundMusicInstance.currentTime
-      }
-
-      audioContext.backgroundMusicInstance.pause()
-      audioContext.backgroundMusicInstance.src = ''
-      audioContext.backgroundMusicInstance = null
-      audioContext.currentBackgroundMusic = null
-      audioContext.bgmLastOperation = 'destroyed'
-
-      console.log('✅ 背景音乐实例已销毁')
-    }
-  }
-
-  // 🔥 新增：验证背景音乐实例状态
-  const validateBackgroundMusicState = (): boolean => {
-    if (!audioContext.backgroundMusicInstance) {
-      return false
-    }
-
-    // 检查实例是否健康
-    const audio = audioContext.backgroundMusicInstance
-    const now = Date.now()
-    const instanceAge = now - audioContext.bgmCreatedTime
-
-    // 如果实例超过1小时，考虑重新创建
-    if (instanceAge > 60 * 60 * 1000) {
-      console.log('⚠️ 背景音乐实例过老，需要重新创建')
-      return false
-    }
-
-    // 检查音频元素是否正常
-    if (audio.error) {
-      console.log('⚠️ 背景音乐实例存在错误，需要重新创建')
-      return false
-    }
-
-    return true
-  }
-
-  // 🔥 新增：恢复背景音乐实例
-  const recoverBackgroundMusicInstance = async (): Promise<boolean> => {
-    console.log('🔄 尝试恢复背景音乐实例')
-
-    // 销毁当前实例
-    destroyBackgroundMusicInstance()
-
-    // 重新创建
-    const success = await createBackgroundMusicInstance()
-
-    if (success && audioContext.bgmPlayPosition > 0) {
-      // 恢复播放位置
-      audioContext.backgroundMusicInstance!.currentTime = audioContext.bgmPlayPosition
-    }
-
-    return success
-  }
-
-  // 🔥 重构：播放背景音乐（暂停/恢复模式）
-  const playBackgroundMusic = async (): Promise<boolean> => {
-    console.log('🎵 播放背景音乐（暂停/恢复模式）')
-
-    if (!canPlayAudio.value || !config.enableMusic) {
-      console.log('🔇 音频系统未就绪或音乐已禁用')
-      return false
-    }
-
-    try {
-      // 确保实例存在且健康
-      if (!audioContext.backgroundMusicInstance || !validateBackgroundMusicState()) {
-        const created = await createBackgroundMusicInstance()
-        if (!created) {
-          console.error('❌ 无法创建背景音乐实例')
-          return false
+        // 清理非循环音效
+        if (!item.howl.loop()) {
+          item.howl.unload()
         }
       }
-
-      const audio = audioContext.backgroundMusicInstance!
-
-      // 更新音量
-      audio.volume = effectiveVolume.value.music
-
-      // 如果已经在播放，直接返回成功
-      if (!audio.paused && !audioContext.isBgmUserPaused) {
-        console.log('🎵 背景音乐已在播放中')
-        return true
-      }
-
-      // 恢复播放位置（如果有保存的位置）
-      if (audioContext.bgmPlayPosition > 0 && audio.currentTime === 0) {
-        audio.currentTime = audioContext.bgmPlayPosition
-      }
-
-      // 开始播放
-      await audio.play()
-      audioContext.isBgmUserPaused = false
-      audioContext.bgmLastOperation = 'play'
-
-      console.log('✅ 背景音乐播放成功')
-      return true
     } catch (error) {
-      console.error('❌ 播放背景音乐失败:', error)
-
-      // 尝试恢复实例
-      const recovered = await recoverBackgroundMusicInstance()
-      if (recovered) {
-        try {
-          await audioContext.backgroundMusicInstance!.play()
-          audioContext.isBgmUserPaused = false
-          audioContext.bgmLastOperation = 'play_recovered'
-          console.log('✅ 背景音乐恢复播放成功')
-          return true
-        } catch (retryError) {
-          console.error('❌ 背景音乐恢复播放失败:', retryError)
-        }
-      }
-
-      return false
+      console.error('❌ 处理音效队列失败:', error)
+      state.errorCount++
+    } finally {
+      isProcessingQueue = false
+      state.sfxQueueLength = sfxQueue.length
     }
   }
 
-  // 🔥 重构：暂停背景音乐（用户主动操作）
-  const pauseBackgroundMusicByUser = (): void => {
-    console.log('🎵 用户暂停背景音乐')
-
-    if (audioContext.backgroundMusicInstance && !audioContext.backgroundMusicInstance.paused) {
-      // 保存当前播放位置
-      audioContext.bgmPlayPosition = audioContext.backgroundMusicInstance.currentTime
-
-      // 暂停播放
-      audioContext.backgroundMusicInstance.pause()
-      audioContext.isBgmUserPaused = true
-      audioContext.bgmLastOperation = 'user_pause'
-
-      console.log('✅ 背景音乐已暂停，位置已保存:', audioContext.bgmPlayPosition)
-    }
-  }
-
-  // 🔥 重构：恢复背景音乐（用户主动操作）
-  const resumeBackgroundMusicByUser = async (): Promise<boolean> => {
-    console.log('🎵 用户恢复背景音乐')
-
-    if (!config.enableMusic) {
-      console.log('🔇 音乐已禁用，无法恢复')
-      return false
-    }
-
-    audioContext.isBgmUserPaused = false
-    return await playBackgroundMusic()
-  }
-
-  // 🔥 重构：音乐开关（暂停/恢复模式）
-  const toggleMusic = async (): Promise<void> => {
-    console.log('🎵 切换背景音乐开关:', config.enableMusic ? '开启→关闭' : '关闭→开启')
-
-    config.enableMusic = !config.enableMusic
-
-    if (config.enableMusic) {
-      // 开启背景音乐：恢复播放
-      await resumeBackgroundMusicByUser()
-    } else {
-      // 关闭背景音乐：暂停播放
-      pauseBackgroundMusicByUser()
-    }
-
-    saveConfig()
-    console.log('✅ 背景音乐开关切换完成:', config.enableMusic ? '已开启' : '已关闭')
-  }
-
-  // 🔥 播放音效 - 保持原有逻辑
+  // 🎯 播放音效
   const playSound = async (
     soundId: string,
-    options: {
-      volume?: number
-      loop?: boolean
-      interrupt?: boolean
-    } = {}
+    options: PlaySoundOptions = {}
   ): Promise<boolean> => {
     if (!canPlayAudio.value) {
       console.warn('⚠️ 音频系统未就绪，跳过播放:', soundId)
       return false
     }
 
-    const soundDef = soundDefinitions[soundId]
-    if (!soundDef) {
-      console.warn(`⚠️ 未找到音效: ${soundId}`)
-      return false
-    }
-
-    const categoryVolume = effectiveVolume.value[soundDef.category]
-    if (categoryVolume <= 0) {
-      console.log(`🔇 ${soundDef.category} 类别音效已禁用，跳过播放:`, soundId)
-      return false
-    }
-
     try {
-      // 背景音乐使用新的暂停/恢复逻辑
+      const soundDef = soundDefinitions[soundId]
+      if (!soundDef) {
+        console.warn(`⚠️ 未找到音效定义: ${soundId}`)
+        return false
+      }
+
+      const categoryVolume = effectiveVolume.value[soundDef.category]
+      if (categoryVolume <= 0) {
+        console.log(`🔇 ${soundDef.category} 类别音效已禁用，跳过播放:`, soundId)
+        return false
+      }
+
+      // 背景音乐特殊处理
       if (soundDef.category === 'music') {
-        return await playBackgroundMusic()
+        return await playBackgroundMusic(soundId)
       }
 
-      // 音效处理 - 保持原有实时创建逻辑
-      const audio = new Audio(soundDef.url)
-      const finalVolume = (options.volume ?? soundDef.volume ?? 1) * categoryVolume
-
-      audio.volume = finalVolume
-      audio.loop = options.loop ?? soundDef.loop ?? false
-
-      // 音效播放时降低背景音乐音量
-      const originalBgVolume = audioContext.backgroundMusicInstance?.volume || 0
-      if (audioContext.backgroundMusicInstance && !audioContext.backgroundMusicInstance.paused) {
-        audioContext.backgroundMusicInstance.volume = originalBgVolume * 0.3
+      // 创建或获取音效实例
+      let soundInstance = soundCache.get(soundId)
+      if (!soundInstance) {
+        soundInstance = createSoundInstance(soundDef)
+        soundCache.set(soundId, soundInstance)
       }
 
-      await audio.play()
+      // 添加到队列
+      const queueItem: SfxQueueItem = {
+        id: soundId,
+        howl: soundInstance,
+        options,
+        timestamp: Date.now(),
+        priority: 1
+      }
 
-      // 音效结束后恢复背景音乐音量
-      audio.addEventListener('ended', () => {
-        if (audioContext.backgroundMusicInstance && !audioContext.backgroundMusicInstance.paused) {
-          audioContext.backgroundMusicInstance.volume = originalBgVolume
-        }
-      })
+      sfxQueue.push(queueItem)
 
       // 触发震动
       if (config.enableVibration && 'vibrate' in navigator) {
         navigator.vibrate(50)
       }
 
-      console.log(`🎵 音效播放成功: ${soundId}`)
+      // 处理队列
+      processQueue()
+
+      state.lastOperation = `play_${soundId}`
+      console.log(`🎵 音效已添加到队列: ${soundId}`)
       return true
     } catch (error) {
       console.error(`❌ 播放音效失败 ${soundId}:`, error)
+      state.errorCount++
       return false
     }
   }
 
-  // 🔥 新增：获取音效状态方法
-  const getSfxStatus = () => {
-    return {
-      enabled: config.enableSfx,
-      volume: effectiveVolume.value.sfx,
-      canPlay: canPlayAudio.value && config.enableSfx,
-      lastToggleTime: Date.now(),
-      systemType: 'pause_resume_mode'
+  // 🎯 播放自定义音频文件
+  const playAudioFile = async (
+    filePath: string,
+    options: PlaySoundOptions = {}
+  ): Promise<boolean> => {
+    if (!canPlayAudio.value) {
+      console.warn('⚠️ 音频系统未就绪，跳过播放:', filePath)
+      return false
+    }
+
+    try {
+      // 支持绝对路径和相对路径
+      const audioSources = filePath.startsWith('/') || filePath.startsWith('http')
+        ? [filePath]
+        : getAudioSources(filePath.replace(/\.[^/.]+$/, '')) // 移除扩展名
+
+      const customSound = new Howl({
+        src: audioSources,
+        volume: options.volume || 1.0,
+        loop: options.loop || false,
+        preload: false,
+        onload: () => {
+          console.log('🎵 自定义音频加载成功:', filePath)
+        },
+        onloaderror: () => {
+          console.error('❌ 自定义音频加载失败:', filePath)
+          state.errorCount++
+        },
+        onplay: () => {
+          if (options.onPlay) options.onPlay()
+        },
+        onend: () => {
+          if (options.onEnd) options.onEnd()
+          customSound.unload() // 播放完成后卸载
+        }
+      })
+
+      // 应用音量设置
+      const finalVolume = (options.volume || 1.0) * effectiveVolume.value.sfx
+      customSound.volume(finalVolume)
+
+      // 播放音频
+      customSound.play()
+
+      state.lastOperation = `play_file_${filePath}`
+      console.log(`🎵 自定义音频播放: ${filePath}`)
+      return true
+    } catch (error) {
+      console.error(`❌ 播放自定义音频失败 ${filePath}:`, error)
+      state.errorCount++
+      return false
     }
   }
 
-  // 🔥 兼容性方法 - 保持向后兼容
-  const stopBackgroundMusic = (): void => {
-    pauseBackgroundMusicByUser()
+  // 🎯 播放背景音乐
+  const playBackgroundMusic = async (musicId: string = 'background'): Promise<boolean> => {
+    if (!canPlayAudio.value || !config.enableMusic) {
+      console.log('🔇 音频系统未就绪或音乐已禁用')
+      return false
+    }
+
+    try {
+      const musicDef = soundDefinitions[musicId]
+      if (!musicDef || musicDef.category !== 'music') {
+        console.error(`❌ 未找到背景音乐定义: ${musicId}`)
+        return false
+      }
+
+      // 停止当前背景音乐
+      if (state.backgroundMusicId && state.backgroundMusicId !== musicId) {
+        await stopBackgroundMusic()
+      }
+
+      // 创建或获取背景音乐实例
+      let musicInstance = backgroundMusicCache.get(musicId)
+      if (!musicInstance) {
+        musicInstance = new Howl({
+          src: getAudioSources(musicDef.filename, musicDef.formats),
+          volume: effectiveVolume.value.music,
+          loop: true,
+          preload: false,
+          onload: () => {
+            console.log(`🎵 背景音乐加载成功: ${musicId}`)
+          },
+          onloaderror: () => {
+            console.error(`❌ 背景音乐加载失败: ${musicId}`)
+            state.errorCount++
+          },
+          onplay: () => {
+            console.log(`🎵 背景音乐播放开始: ${musicId}`)
+          },
+          onend: () => {
+            console.log(`🎵 背景音乐播放结束: ${musicId}`)
+          }
+        })
+        backgroundMusicCache.set(musicId, musicInstance)
+      }
+
+      // 如果已经在播放，跳过
+      if (musicInstance.playing() && !state.isBgmUserPaused) {
+        console.log('🎵 背景音乐已在播放中')
+        return true
+      }
+
+      // 恢复播放位置
+      if (state.backgroundMusicPosition > 0) {
+        musicInstance.seek(state.backgroundMusicPosition)
+      }
+
+      // 开始播放
+      musicInstance.play()
+      state.backgroundMusicId = musicId
+      state.isBgmUserPaused = false
+      state.lastOperation = `play_background_${musicId}`
+
+      console.log(`✅ 背景音乐播放成功: ${musicId}`)
+      return true
+    } catch (error) {
+      console.error(`❌ 播放背景音乐失败 ${musicId}:`, error)
+      state.errorCount++
+      return false
+    }
   }
 
+  // 🎯 暂停背景音乐
   const pauseBackgroundMusic = (): void => {
-    if (audioContext.backgroundMusicInstance && !audioContext.backgroundMusicInstance.paused) {
-      audioContext.backgroundMusicInstance.pause()
-      console.log('⏸️ 背景音乐已暂停（系统调用）')
+    if (!state.backgroundMusicId) return
+
+    const musicInstance = backgroundMusicCache.get(state.backgroundMusicId)
+    if (musicInstance && musicInstance.playing()) {
+      state.backgroundMusicPosition = musicInstance.seek() as number
+      musicInstance.pause()
+      state.isBgmUserPaused = true
+      state.lastOperation = 'pause_background'
+      console.log('⏸️ 背景音乐已暂停')
     }
   }
 
+  // 🎯 恢复背景音乐
   const resumeBackgroundMusic = (): void => {
-    if (audioContext.backgroundMusicInstance && audioContext.backgroundMusicInstance.paused && !audioContext.isBgmUserPaused) {
-      audioContext.backgroundMusicInstance.play()
-      console.log('▶️ 背景音乐已恢复（系统调用）')
+    if (!state.backgroundMusicId || !config.enableMusic) return
+
+    const musicInstance = backgroundMusicCache.get(state.backgroundMusicId)
+    if (musicInstance && !musicInstance.playing()) {
+      musicInstance.play()
+      state.isBgmUserPaused = false
+      state.lastOperation = 'resume_background'
+      console.log('▶️ 背景音乐已恢复')
     }
   }
 
-  const startBackgroundMusicIfEnabled = async (): Promise<boolean> => {
-    console.log('🎵 检查背景音乐设置:', {
-      enableMusic: config.enableMusic,
-      canPlayAudio: canPlayAudio.value,
-      hasInstance: !!audioContext.backgroundMusicInstance,
-      userPaused: audioContext.isBgmUserPaused
-    })
+  // 🎯 停止背景音乐
+  const stopBackgroundMusic = async (): Promise<void> => {
+    if (!state.backgroundMusicId) return
 
-    if (config.enableMusic && canPlayAudio.value && !audioContext.isBgmUserPaused) {
-      console.log('🎵 自动开始播放背景音乐')
-      return await playBackgroundMusic()
-    }
-
-    return false
-  }
-
-  // 🔥 音量控制 - 新增背景音乐音量同步
-  const updateBackgroundMusicVolume = (): void => {
-    if (audioContext.backgroundMusicInstance) {
-      const newVolume = effectiveVolume.value.music
-      audioContext.backgroundMusicInstance.volume = newVolume
-      console.log('🎵 背景音乐音量已更新:', newVolume)
+    const musicInstance = backgroundMusicCache.get(state.backgroundMusicId)
+    if (musicInstance) {
+      musicInstance.stop()
+      state.backgroundMusicPosition = 0
+      state.isBgmUserPaused = false
+      state.lastOperation = 'stop_background'
+      console.log('⏹️ 背景音乐已停止')
     }
   }
 
+  // 🎯 切换背景音乐
+  const toggleMusic = async (): Promise<void> => {
+    config.enableMusic = !config.enableMusic
+
+    if (config.enableMusic) {
+      await playBackgroundMusic()
+    } else {
+      pauseBackgroundMusic()
+    }
+
+    saveConfig()
+    state.lastOperation = 'toggle_music'
+    console.log('🎵 背景音乐开关切换:', config.enableMusic ? '已开启' : '已关闭')
+  }
+
+  // 🎯 音量控制
   const setMasterVolume = (volume: number): void => {
     config.masterVolume = Math.max(0, Math.min(1, volume))
+    Howler.volume(config.masterVolume)
     updateBackgroundMusicVolume()
     saveConfig()
   }
@@ -546,35 +636,104 @@ function createAudioSystem() {
     saveConfig()
   }
 
-  const toggleSfx = (): void => {
-    config.enableSfx = !config.enableSfx
-    console.log('🎵 音效开关切换:', config.enableSfx ? '开启' : '关闭')
-    saveConfig()
+  const updateBackgroundMusicVolume = (): void => {
+    if (state.backgroundMusicId) {
+      const musicInstance = backgroundMusicCache.get(state.backgroundMusicId)
+      if (musicInstance) {
+        musicInstance.volume(effectiveVolume.value.music)
+      }
+    }
   }
 
-  // 🔥 快捷播放方法
-  const playChipSelectSound = () => playSound('chip-select')
-  const playChipPlaceSound = () => playSound('chip-place')
-  const playBetConfirmSound = () => playSound('bet-confirm')
+  // 🎯 音效开关
+  const toggleSfx = (): void => {
+    config.enableSfx = !config.enableSfx
+    saveConfig()
+    state.lastOperation = 'toggle_sfx'
+    console.log('🎵 音效开关切换:', config.enableSfx ? '开启' : '关闭')
+  }
+
+  // 🎯 播放开牌语音 - 百家乐版本
+  const playOpenCardAudio = async (betId: string): Promise<boolean> => {
+    if (!canPlayAudio.value || !config.enableSfx) {
+      console.log('🔇 音频系统未就绪或音效已禁用，跳过开牌语音')
+      return false
+    }
+
+    try {
+      console.log('🎵 播放开牌语音:', betId)
+
+      // 创建开牌语音实例
+      const openCardSound = new Howl({
+        src: getAudioSources(`open/${betId}`),
+        volume: effectiveVolume.value.sfx,
+        preload: false,
+        onload: () => {
+          console.log(`🎵 开牌语音加载成功: ${betId}`)
+        },
+        onloaderror: () => {
+          console.error(`❌ 开牌语音加载失败: ${betId}`)
+          state.errorCount++
+        },
+        onplay: () => {
+          console.log(`🎵 开牌语音播放开始: ${betId}`)
+        },
+        onend: () => {
+          console.log(`🎵 开牌语音播放结束: ${betId}`)
+          openCardSound.unload() // 播放完成后卸载
+        }
+      })
+
+      // 播放开牌语音
+      openCardSound.play()
+      state.lastOperation = `play_open_card_${betId}`
+
+      console.log(`✅ 开牌语音播放: ${betId}`)
+      return true
+    } catch (error) {
+      console.error('❌ 开牌语音播放失败:', error)
+      state.errorCount++
+      return false
+    }
+  }
+
+  // 🎯 百家乐快捷播放方法
+  const playBetSound = () => playSound('bet')
+  const playBetSuccessSound = () => playSound('betSuccess')
+  const playBetSoundEffect = () => playSound('betSound')
   const playErrorSound = () => playSound('error')
   const playWinSound = () => playSound('win')
-  const playDiceRollSound = () => playSound('dice-roll')
-  const playBetStartSound = () => playSound('bet-start')
-  const playBetStopSound = () => playSound('bet-stop')
+  const playBigWinSound = () => playSound('bigWin')
+  const playJackpotSound = () => playSound('jackpot')
+  const playCelebrationSound = () => playSound('celebration')
+  const playCoinSound = () => playSound('coin')
+  const playWelcomeSound = () => playSound('welcome')
+  const playStopSound = () => playSound('stop')
+  const playTieSound = () => playSound('tie')
+  const playOpenCardSound = () => playSound('OPENCARD')
 
-  // 🔥 配置管理 - 新增背景音乐状态保存
+  // 庄家点数语音
+  const playBankerSound = (point: number) => playSound(`banker${point}`)
+  const playBankerWinSound = () => playSound('bankerWin')
+
+  // 玩家点数语音
+  const playPlayerSound = (point: number) => playSound(`player${point}`)
+  const playPlayerWinSound = () => playSound('playerWin')
+
+  // 🎯 配置管理
   const saveConfig = (): void => {
     try {
       const configToSave = {
         ...config,
-        // 新增：保存背景音乐状态
-        isBgmUserPaused: audioContext.isBgmUserPaused,
-        bgmPlayPosition: audioContext.bgmPlayPosition
+        backgroundMusicPosition: state.backgroundMusicPosition,
+        isBgmUserPaused: state.isBgmUserPaused,
+        backgroundMusicId: state.backgroundMusicId
       }
       localStorage.setItem('bjl_audio_config', JSON.stringify(configToSave))
       console.log('💾 音频配置已保存')
     } catch (error) {
       console.error('❌ 保存音频配置失败:', error)
+      state.errorCount++
     }
   }
 
@@ -594,188 +753,92 @@ function createAudioSystem() {
           enableVibration: savedConfig.enableVibration ?? config.enableVibration
         })
 
-        // 新增：加载背景音乐状态
-        audioContext.isBgmUserPaused = savedConfig.isBgmUserPaused ?? false
-        audioContext.bgmPlayPosition = savedConfig.bgmPlayPosition ?? 0
+        // 加载背景音乐状态
+        state.backgroundMusicPosition = savedConfig.backgroundMusicPosition ?? 0
+        state.isBgmUserPaused = savedConfig.isBgmUserPaused ?? false
+        state.backgroundMusicId = savedConfig.backgroundMusicId ?? null
 
         console.log('📂 音频配置已加载:', config)
       }
     } catch (error) {
       console.error('❌ 加载音频配置失败:', error)
+      state.errorCount++
     }
   }
 
-  // 获取音频信息
+  // 🎯 系统清理
+  const cleanup = (): void => {
+    console.log('🧹 清理音频系统...')
+
+    // 停止所有音效
+    sfxQueue.length = 0
+    soundCache.forEach(sound => sound.unload())
+    soundCache.clear()
+
+    // 停止背景音乐
+    backgroundMusicCache.forEach(music => music.unload())
+    backgroundMusicCache.clear()
+
+    // 重置状态
+    state.backgroundMusicId = null
+    state.backgroundMusicPosition = 0
+    state.isBgmUserPaused = false
+    state.lastOperation = 'cleanup'
+
+    console.log('✅ 音频系统清理完成')
+  }
+
+  // 🎯 获取系统信息 - iOS Safari 优化
   const getAudioInfo = () => ({
-    isInitialized: isInitialized.value,
-    canPlayAudio: canPlayAudio.value,
-    hasBackgroundMusic: !!audioContext.backgroundMusicInstance,
-    isBackgroundMusicPlaying: isBackgroundMusicPlaying.value,
-    isBgmUserPaused: audioContext.isBgmUserPaused,
-    bgmPlayPosition: audioContext.bgmPlayPosition,
-    bgmLastOperation: audioContext.bgmLastOperation,
-    config: { ...config }
+    ...state,
+    config: { ...config },
+    queueLength: sfxQueue.length,
+    cacheSize: soundCache.size,
+    backgroundMusicCacheSize: backgroundMusicCache.size,
+    howlerVersion: (Howler as unknown as { version?: string }).version || 'unknown',
+    // iOS Safari 特殊信息
+    platform: {
+      isIOSSafari,
+      isSafari,
+      isIOS,
+      hasUserInteracted: iosState.hasUserInteracted,
+      isPlayingSfx: iosState.isPlayingSfx,
+      backgroundMusicPausedForSfx: iosState.backgroundMusicPausedForSfx,
+      maxCacheSize
+    }
   })
 
-  // 🔥 语音播放状态管理
-  const diceAudioState = reactive({
-    isPlaying: false,
-    currentSequence: [] as string[],
-    currentIndex: 0,
-    abortController: null as AbortController | null
+  const getSfxStatus = () => ({
+    enabled: config.enableSfx,
+    volume: effectiveVolume.value.sfx,
+    canPlay: canPlayAudio.value && config.enableSfx,
+    queueLength: sfxQueue.length,
+    isProcessing: isProcessingQueue,
+    systemType: isIOSSafari ? 'ios_safari_optimized' : 'howler_based',
+    currentSfxId: iosState.currentSfxId,
+    hasUserInteracted: iosState.hasUserInteracted
   })
 
-  // 🔥 新增：根据骰子点数生成语音播放序列
-  const generateAudioSequence = (dice1: string, dice2: string, dice3: string): string[] => {
-    try {
-      // 转换为数字并验证
-      const d1 = parseInt(dice1)
-      const d2 = parseInt(dice2)
-      const d3 = parseInt(dice3)
-
-      // 验证骰子点数范围
-      if ([d1, d2, d3].some(d => d < 1 || d > 6 || isNaN(d))) {
-        console.warn('⚠️ 无效的骰子点数:', { dice1, dice2, dice3 })
-        return []
-      }
-
-      // 计算总和
-      const total = d1 + d2 + d3
-
-      // 判断大小 (4-10为小, 11-17为大)
-      const bigSmall = total >= 4 && total <= 10 ? 'dice-small' : 'dice-big'
-
-      // 判断单双
-      const oddEven = total % 2 === 1 ? 'dice-dan' : 'dice-shuang'
-
-      // 组合播放序列：开牌音 + 三个骰子 + 大小 + 单双
-      const sequence = [
-        'dice-kai',
-        `dice-${dice1}`,
-        `dice-${dice2}`,
-        `dice-${dice3}`,
-        bigSmall,
-        oddEven
-      ]
-
-      console.log('🎵 生成语音序列:', sequence, { total, bigSmall, oddEven })
-      return sequence
-    } catch (error) {
-      console.error('❌ 生成语音序列失败:', error)
-      return []
+  // 🎯 iOS Safari 手动触发用户交互
+  const triggerUserInteraction = (): void => {
+    if (isIOSSafari && !iosState.hasUserInteracted) {
+      iosState.hasUserInteracted = true
+      console.log('✅ iOS Safari 用户交互已手动激活')
     }
   }
 
-  // 🔥 新增：按序列播放音频文件
-  const playAudioSequence = async (sequence: string[], interval: number = 400): Promise<boolean> => {
-    if (!canPlayAudio.value || !config.enableSfx) {
-      console.log('🔇 音频系统未就绪或音效已禁用，跳过播放')
-      return false
+  // 🎯 自动启动背景音乐
+  const startBackgroundMusicIfEnabled = async (): Promise<boolean> => {
+    if (config.enableMusic && canPlayAudio.value && !state.isBgmUserPaused) {
+      return await playBackgroundMusic()
     }
-
-    if (!sequence || sequence.length === 0) {
-      console.log('🔇 播放序列为空，跳过播放')
-      return false
-    }
-
-    // 如果正在播放，先中断当前播放
-    if (diceAudioState.isPlaying) {
-      console.log('🔄 中断当前语音播放')
-      if (diceAudioState.abortController) {
-        diceAudioState.abortController.abort()
-      }
-    }
-
-    try {
-      // 设置播放状态
-      diceAudioState.isPlaying = true
-      diceAudioState.currentSequence = [...sequence]
-      diceAudioState.currentIndex = 0
-      diceAudioState.abortController = new AbortController()
-
-      console.log('🎵 开始播放语音序列:', sequence)
-
-      // 降低背景音乐音量
-      const originalBgVolume = audioContext.backgroundMusicInstance?.volume || 0
-      if (audioContext.backgroundMusicInstance && !audioContext.backgroundMusicInstance.paused) {
-        audioContext.backgroundMusicInstance.volume = originalBgVolume * 0.2
-      }
-
-      // 逐个播放音频
-      for (let i = 0; i < sequence.length; i++) {
-        // 检查是否被中断
-        if (diceAudioState.abortController?.signal.aborted) {
-          console.log('🔄 语音播放被中断')
-          break
-        }
-
-        const audioId = sequence[i]
-        diceAudioState.currentIndex = i
-
-        console.log(`🎵 播放第${i + 1}个音频:`, audioId)
-
-        // 播放单个音频
-        const success = await playSound(audioId)
-        if (!success) {
-          console.warn(`⚠️ 播放音频失败: ${audioId}`)
-          // 继续播放下一个，不中断整个序列
-        }
-
-        // 等待间隔时间（最后一个音频不需要等待）
-        if (i < sequence.length - 1) {
-          await new Promise(resolve => {
-            const timer = setTimeout(resolve, interval)
-
-            // 监听中断信号
-            diceAudioState.abortController?.signal.addEventListener('abort', () => {
-              clearTimeout(timer)
-              resolve(void 0)
-            })
-          })
-        }
-      }
-
-      // 恢复背景音乐音量
-      if (audioContext.backgroundMusicInstance && !audioContext.backgroundMusicInstance.paused) {
-        audioContext.backgroundMusicInstance.volume = originalBgVolume
-      }
-
-      console.log('✅ 语音序列播放完成')
-      return true
-    } catch (error) {
-      console.error('❌ 播放语音序列失败:', error)
-      return false
-    } finally {
-      // 重置播放状态
-      diceAudioState.isPlaying = false
-      diceAudioState.currentSequence = []
-      diceAudioState.currentIndex = 0
-      diceAudioState.abortController = null
-    }
+    return false
   }
-
-  // 🔥 新增：开牌语音播放主函数（对外接口）
-  const playDiceResultAudio = async (dice1: string, dice2: string, dice3: string): Promise<boolean> => {
-    console.log('🎵 开牌语音播放:', { dice1, dice2, dice3 })
-
-    // 生成播放序列
-    const sequence = generateAudioSequence(dice1, dice2, dice3)
-    if (sequence.length === 0) {
-      console.warn('⚠️ 无法生成有效的语音序列')
-      return false
-    }
-
-    // 播放序列
-    return await playAudioSequence(sequence)
-  }
-
-
 
   return {
     // 状态
     config,
-    audioContext: readonly(audioContext),
-    isInitialized: readonly(isInitialized),
+    state: readonly(state),
 
     // 计算属性
     canPlayAudio,
@@ -786,19 +849,13 @@ function createAudioSystem() {
     initializeAudio,
     unlockAudioContext,
     playSound,
+    playAudioFile,
 
-    // 🔥 新的背景音乐控制方法
-    createBackgroundMusicInstance,
-    destroyBackgroundMusicInstance,
+    // 背景音乐控制
     playBackgroundMusic,
-    pauseBackgroundMusicByUser,
-    resumeBackgroundMusicByUser,
-    validateBackgroundMusicState,
-
-    // 兼容性方法
-    stopBackgroundMusic,
     pauseBackgroundMusic,
     resumeBackgroundMusic,
+    stopBackgroundMusic,
     startBackgroundMusicIfEnabled,
 
     // 音量和开关控制
@@ -810,69 +867,84 @@ function createAudioSystem() {
     updateBackgroundMusicVolume,
 
     // 快捷方法
-    playChipSelectSound,
-    playChipPlaceSound,
-    playBetConfirmSound,
+    playBetSound,
+    playBetSuccessSound,
+    playBetSoundEffect,
     playErrorSound,
     playWinSound,
-    playDiceRollSound,
-    playBetStartSound,
-    playBetStopSound,
+    playBigWinSound,
+    playJackpotSound,
+    playCelebrationSound,
+    playCoinSound,
+    playWelcomeSound,
+    playStopSound,
+    playTieSound,
+    playOpenCardSound,
+    playBankerSound,
+    playBankerWinSound,
+    playPlayerSound,
+    playPlayerWinSound,
 
-    // 配置管理
+    // 开牌语音
+    playOpenCardAudio,
+
+    // 配置和系统管理
     saveConfig,
     loadConfig,
+    cleanup,
     getAudioInfo,
-    getSfxStatus, // 🔥 新增：音效状态获取方法
+    getSfxStatus,
 
-    // 🔥 新增：开牌语音播放
-    playDiceResultAudio,
-    generateAudioSequence,
-    playAudioSequence
+    // 🎯 iOS Safari 专用方法
+    triggerUserInteraction,
+
+    // 🎯 iOS Safari 状态检查
+    isIOSSafari: () => isIOSSafari,
+    hasUserInteracted: () => iosState.hasUserInteracted,
+    isPlayingSfx: () => iosState.isPlayingSfx
   }
 }
 
-// 🔥 单例模式的 useAudio 导出
+// 🎯 单例模式导出
 export const useAudio = () => {
   if (!audioSystemInstance) {
-    console.log('🎵 首次创建音频系统单例（暂停/恢复模式）')
+    console.log('🎵 首次创建 Howler.js 音频系统单例')
     audioSystemInstance = createAudioSystem()
     audioSystemInstance.loadConfig()
   }
-
   return audioSystemInstance
 }
 
-// 🔥 全局初始化方法
+// 🎯 全局初始化
 export const initializeGlobalAudioSystem = async (): Promise<boolean> => {
   if (isGlobalInitialized) {
     console.log('🎵 全局音频系统已初始化，跳过')
     return true
   }
 
-  console.log('🎵 开始全局音频系统初始化（暂停/恢复模式）')
+  console.log('🎵 开始全局音频系统初始化 (Howler.js)')
   const audioSystem = useAudio()
   const result = await audioSystem.initializeAudio()
 
   if (result) {
     isGlobalInitialized = true
-    console.log('✅ 全局音频系统初始化完成（暂停/恢复模式）')
+    console.log('✅ 全局音频系统初始化完成 (Howler.js)')
   }
 
   return result
 }
 
-// 🔥 全局解锁方法
+// 🎯 全局解锁
 export const unlockGlobalAudioContext = async (): Promise<boolean> => {
   const audioSystem = useAudio()
   return await audioSystem.unlockAudioContext()
 }
 
-// 🔥 全局清理方法 - 应用卸载时调用
+// 🎯 全局清理
 export const cleanupGlobalAudioSystem = (): void => {
   if (audioSystemInstance) {
     console.log('🎵 清理全局音频系统')
-    audioSystemInstance.destroyBackgroundMusicInstance()
+    audioSystemInstance.cleanup()
     audioSystemInstance = null
     isGlobalInitialized = false
   }

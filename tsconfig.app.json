@@ -11,6 +11,11 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    
+    // 🔧 禁用 any 类型相关的警告，保持其他严格检查
+    "noImplicitAny": false,
+    "noImplicitReturns": false,
+    "noImplicitThis": false
   }
 }

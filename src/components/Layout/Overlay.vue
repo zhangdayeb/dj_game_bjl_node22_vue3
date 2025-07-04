@@ -1,424 +1,309 @@
 <!-- src/components/Layout/Overlay.vue -->
 <template>
   <div class="overlay-system">
-    <!-- 特效层 -->
-    <transition name="effect-fade">
+    <!-- 开牌特效 -->
+    <transition name="result-fade">
       <ResultEffect
         v-if="showResultEffect"
+        :show="showResultEffect"
+        :resultData="resultData"
+        :autoClose="true"
+        :closeDuration="8000"
         @close="handleResultEffectClose"
+        @complete="handleResultEffectComplete"
       />
     </transition>
 
-    <transition name="effect-fade">
+    <!-- 中奖特效 -->
+    <transition name="winning-fade">
       <WinningEffect
         v-if="showWinningEffect"
-        @close="handleWinningEffectClose"
+        :show="showWinningEffect"
+        :winAmount="winAmount"
+        :winType="winType"
+        :duration="5000"
+        @finished="handleWinningEffectFinished"
       />
     </transition>
-
-    <!-- 面板层 -->
-    <transition name="panel-slide">
-      <BettingHistoryModal
-        v-if="showBettingHistory"
-        @close="handleBettingHistoryClose"
-      />
-    </transition>
-
-    <transition name="panel-slide">
-      <SettingsPanel
-        v-if="showSettings"
-        @close="handleSettingsClose"
-      />
-    </transition>
-
-    <!-- 筹码选择器 -->
-    <transition name="chip-selector-fade">
-      <ChipSelector
-        v-if="showChipSelector"
-        :availableChips="availableChips"
-        :selectedChips="selectedChips"
-        :maxSelection="maxSelection"
-        @confirm="handleChipSelectorConfirm"
-        @cancel="handleChipSelectorCancel"
-        @close="handleChipSelectorClose"
-      />
-    </transition>
-
-    <!-- 通用模态框 -->
-    <transition name="modal-fade">
-      <div class="modal-backdrop" v-if="showModal" @click="handleModalBackdropClick">
-        <div class="modal-content" @click.stop>
-          <slot name="modal"></slot>
-        </div>
-      </div>
-    </transition>
-
-    <!-- 通知消息 -->
-    <transition-group name="notification" tag="div" class="notification-container">
-      <div
-        v-for="notification in notifications"
-        :key="notification.id"
-        class="notification-item"
-        :class="[
-          `notification-${notification.type}`,
-          { 'notification-dismissible': notification.dismissible }
-        ]"
-      >
-        <div class="notification-icon">
-          <svg v-if="notification.type === 'success'" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-          </svg>
-          <svg v-else-if="notification.type === 'error'" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-          </svg>
-          <svg v-else-if="notification.type === 'warning'" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-          </svg>
-          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-          </svg>
-        </div>
-        <div class="notification-content">
-          <div class="notification-title" v-if="notification.title">{{ notification.title }}</div>
-          <div class="notification-message">{{ notification.message }}</div>
-        </div>
-        <button
-          v-if="notification.dismissible"
-          class="notification-close"
-          @click="dismissNotification(notification.id)"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-          </svg>
-        </button>
-      </div>
-    </transition-group>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, type PropType } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useGameStore } from '@/stores/gameStore'
+import { useBettingStore } from '@/stores/bettingStore'
 
 // 组件导入
 import ResultEffect from '@/components/Effects/ResultEffect.vue'
 import WinningEffect from '@/components/Effects/WinningEffect.vue'
-import BettingHistoryModal from '@/components/Panels/BettingHistory/BettingHistoryModal.vue'
-import SettingsPanel from '@/components/Panels/SettingsPanel.vue'
-import ChipSelector from '@/components/Panels/ChipSelector.vue'
 
-// 通知类型
-interface Notification {
-  id: string
-  type: 'success' | 'error' | 'warning' | 'info'
-  title?: string
-  message: string
-  duration?: number
-  dismissible?: boolean
+// Store 初始化
+let gameStore: any = null
+let bettingStore: any = null
+
+try {
+  gameStore = useGameStore()
+  bettingStore = useBettingStore()
+} catch (error) {
+  console.error('❌ Store 初始化失败:', error)
+  // 创建默认对象避免错误
+  gameStore = {
+    gameState: { status: 'waiting' },
+    balance: 10000
+  }
+  bettingStore = {
+    winningFlash: {},
+    totalUserBets: 0
+  }
 }
 
-// Props
-interface Props {
-  showResultEffect: boolean
-  showWinningEffect: boolean
-  showBettingHistory: boolean
-  showSettings: boolean
-  showChipSelector: boolean
-  showModal: boolean
-  availableChips: any[]
-  selectedChips: string[]
-  maxSelection: number
-  notifications: Notification[]
-}
+// 响应式数据
+const showResultEffect = ref(false)
+const showWinningEffect = ref(false)
+const resultData = ref<any>(null)
+const winAmount = ref(0)
+const winType = ref<'normal' | 'big' | 'super' | 'jackpot'>('normal')
 
-const props = withDefaults(defineProps<Props>(), {
-  showResultEffect: false,
-  showWinningEffect: false,
-  showBettingHistory: false,
-  showSettings: false,
-  showChipSelector: false,
-  showModal: false,
-  availableChips: () => [],
-  selectedChips: () => [],
-  maxSelection: 5,
-  notifications: () => []
+// 计算属性 - 从共享数据中获取显示状态
+const shouldShowResultEffect = computed(() => {
+  return gameStore?.gameState?.status === 'result'
 })
 
-// Emits
-const emit = defineEmits<{
-  // 特效事件
-  resultEffectClose: []
-  winningEffectClose: []
+const shouldShowWinningEffect = computed(() => {
+  // 检查是否有中奖区域在闪烁
+  if (!bettingStore?.winningFlash) return false
 
-  // 面板事件
-  bettingHistoryClose: []
-  settingsClose: []
+  const hasWinning = Object.values(bettingStore.winningFlash).some(
+    (isFlashing: any) => isFlashing === true
+  )
 
-  // 筹码选择器事件
-  chipSelectorConfirm: [chipIds: string[]]
-  chipSelectorCancel: []
-  chipSelectorClose: []
+  return hasWinning && winAmount.value > 0
+})
 
-  // 模态框事件
-  modalClose: []
+// 监听游戏状态变化 - 触发开牌特效
+watch(shouldShowResultEffect, (newVal) => {
+  if (newVal) {
+    console.log('🎴 触发开牌特效')
 
-  // 通知事件
-  notificationDismiss: [id: string]
-}>()
+    // 模拟开牌结果数据（实际项目中应该从 API 获取）
+    resultData.value = {
+      result: {
+        zhuang_score: Math.floor(Math.random() * 10),
+        xian_score: Math.floor(Math.random() * 10)
+      },
+      info: {
+        zhuang: {
+          card1: 'h1.png',
+          card2: 's5.png',
+          card3: 'd3.png'
+        },
+        xian: {
+          card1: 'c7.png',
+          card2: 'h9.png'
+        }
+      },
+      pai_flash: ['庄', '庄对'] // 中奖区域
+    }
 
-// 事件处理
+    showResultEffect.value = true
+  }
+})
+
+// 监听中奖状态变化 - 触发中奖特效
+watch(shouldShowWinningEffect, (newVal) => {
+  if (newVal) {
+    console.log('🎉 触发中奖特效')
+
+    // 计算中奖金额（基于用户投注）
+    const totalBets = bettingStore?.totalUserBets || 0
+    const calculatedWinAmount = totalBets * 2 // 简单的 2倍赔率计算
+
+    winAmount.value = calculatedWinAmount
+
+    // 根据中奖金额确定特效类型
+    if (calculatedWinAmount >= 10000) {
+      winType.value = 'jackpot'
+    } else if (calculatedWinAmount >= 5000) {
+      winType.value = 'super'
+    } else if (calculatedWinAmount >= 1000) {
+      winType.value = 'big'
+    } else {
+      winType.value = 'normal'
+    }
+
+    showWinningEffect.value = true
+  }
+})
+
+// 监听余额变化 - 检测中奖
+let previousBalance = ref(gameStore?.balance || 0)
+watch(() => gameStore?.balance, (newBalance) => {
+  if (newBalance > previousBalance.value) {
+    const winAmount = newBalance - previousBalance.value
+    if (winAmount > 0) {
+      console.log('💰 检测到余额增加，触发中奖特效:', winAmount)
+      handleWinDetected(winAmount)
+    }
+  }
+  previousBalance.value = newBalance
+})
+
+// 方法
+const handleWinDetected = (amount: number) => {
+  winAmount.value = amount
+
+  // 根据中奖金额确定特效类型
+  if (amount >= 10000) {
+    winType.value = 'jackpot'
+  } else if (amount >= 5000) {
+    winType.value = 'super'
+  } else if (amount >= 1000) {
+    winType.value = 'big'
+  } else {
+    winType.value = 'normal'
+  }
+
+  showWinningEffect.value = true
+}
+
 const handleResultEffectClose = () => {
-  console.log('🎭 关闭结果特效')
-  emit('resultEffectClose')
+  console.log('🎴 关闭开牌特效')
+  showResultEffect.value = false
+  resultData.value = null
 }
 
-const handleWinningEffectClose = () => {
-  console.log('🎉 关闭中奖特效')
-  emit('winningEffectClose')
+const handleResultEffectComplete = () => {
+  console.log('🎴 开牌特效播放完成')
+
+  // 检查是否有中奖，如果有则触发中奖特效
+  if (resultData.value?.pai_flash && resultData.value.pai_flash.length > 0) {
+    // 延迟一秒后触发中奖特效
+    setTimeout(() => {
+      const mockWinAmount = 1000 + Math.random() * 5000
+      handleWinDetected(mockWinAmount)
+    }, 1000)
+  }
 }
 
-const handleBettingHistoryClose = () => {
-  console.log('📊 关闭投注记录')
-  emit('bettingHistoryClose')
+const handleWinningEffectFinished = () => {
+  console.log('🎉 中奖特效播放完成')
+  showWinningEffect.value = false
+  winAmount.value = 0
 }
 
-const handleSettingsClose = () => {
-  console.log('⚙️ 关闭设置面板')
-  emit('settingsClose')
+// 🔥 暴露方法给外部调用（用于测试或手动触发）
+const triggerResultEffect = (data?: any) => {
+  console.log('🎴 手动触发开牌特效')
+  resultData.value = data || {
+    result: {
+      zhuang_score: Math.floor(Math.random() * 10),
+      xian_score: Math.floor(Math.random() * 10)
+    },
+    info: {
+      zhuang: {
+        card1: 'h1.png',
+        card2: 's5.png'
+      },
+      xian: {
+        card1: 'c7.png',
+        card2: 'h9.png'
+      }
+    },
+    pai_flash: ['庄']
+  }
+  showResultEffect.value = true
 }
 
-const handleChipSelectorConfirm = (chipIds: string[]) => {
-  console.log('✅ 确认筹码选择:', chipIds)
-  emit('chipSelectorConfirm', chipIds)
+const triggerWinningEffect = (amount: number = 1000, type: 'normal' | 'big' | 'super' | 'jackpot' = 'normal') => {
+  console.log('🎉 手动触发中奖特效')
+  winAmount.value = amount
+  winType.value = type
+  showWinningEffect.value = true
 }
 
-const handleChipSelectorCancel = () => {
-  console.log('❌ 取消筹码选择')
-  emit('chipSelectorCancel')
+// 🔥 开发模式下暴露调试方法
+if (import.meta.env.DEV) {
+  ;(window as any).overlayDebug = {
+    triggerResultEffect,
+    triggerWinningEffect,
+    showResultEffect,
+    showWinningEffect,
+    resultData,
+    winAmount,
+    winType
+  }
 }
 
-const handleChipSelectorClose = () => {
-  console.log('🔒 关闭筹码选择器')
-  emit('chipSelectorClose')
-}
+// 生命周期
+onMounted(() => {
+  console.log('🎯 Overlay 组件已挂载')
+  if (gameStore?.balance) {
+    previousBalance.value = gameStore.balance
+  }
+})
 
-const handleModalBackdropClick = () => {
-  console.log('🔒 点击模态框背景关闭')
-  emit('modalClose')
-}
-
-const dismissNotification = (id: string) => {
-  console.log(`🔔 关闭通知: ${id}`)
-  emit('notificationDismiss', id)
-}
+onUnmounted(() => {
+  console.log('🎯 Overlay 组件已卸载')
+})
 </script>
 
 <style scoped>
 .overlay-system {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   pointer-events: none;
-  z-index: 1000;
+  z-index: 9999;
 }
 
 .overlay-system > * {
   pointer-events: auto;
 }
 
-/* 模态框样式 */
-.modal-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1001;
+/* 开牌特效过渡动画 */
+.result-fade-enter-active {
+  transition: all 0.3s ease-out;
 }
 
-.modal-content {
-  max-width: 90vw;
-  max-height: 90vh;
-  overflow: auto;
+.result-fade-leave-active {
+  transition: all 0.3s ease-in;
 }
 
-/* 通知容器 */
-.notification-container {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1002;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.notification-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.9);
-  border-radius: 8px;
-  border-left: 4px solid;
-  color: white;
-  min-width: 300px;
-  max-width: 400px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(8px);
-  pointer-events: auto;
-}
-
-.notification-success {
-  border-left-color: #52c41a;
-}
-
-.notification-error {
-  border-left-color: #ff4d4f;
-}
-
-.notification-warning {
-  border-left-color: #faad14;
-}
-
-.notification-info {
-  border-left-color: #40a9ff;
-}
-
-.notification-icon {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.notification-success .notification-icon {
-  color: #52c41a;
-}
-
-.notification-error .notification-icon {
-  color: #ff4d4f;
-}
-
-.notification-warning .notification-icon {
-  color: #faad14;
-}
-
-.notification-info .notification-icon {
-  color: #40a9ff;
-}
-
-.notification-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.notification-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: white;
-}
-
-.notification-message {
-  font-size: 12px;
-  line-height: 1.4;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.notification-close {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  border-radius: 4px;
-  color: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.notification-close:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-/* 动画效果 */
-.effect-fade-enter-active,
-.effect-fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.effect-fade-enter-from,
-.effect-fade-leave-to {
+.result-fade-enter-from {
   opacity: 0;
   transform: scale(0.9);
 }
 
-.panel-slide-enter-active,
-.panel-slide-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.panel-slide-enter-from,
-.panel-slide-leave-to {
+.result-fade-leave-to {
   opacity: 0;
-  transform: translateY(20px);
+  transform: scale(1.1);
 }
 
-.chip-selector-fade-enter-active,
-.chip-selector-fade-leave-active {
-  transition: all 0.3s ease;
+/* 中奖特效过渡动画 */
+.winning-fade-enter-active {
+  transition: all 0.5s ease-out;
 }
 
-.chip-selector-fade-enter-from,
-.chip-selector-fade-leave-to {
+.winning-fade-leave-active {
+  transition: all 0.5s ease-in;
+}
+
+.winning-fade-enter-from {
   opacity: 0;
+  transform: scale(0.8);
 }
 
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.modal-fade-enter-from,
-.modal-fade-leave-to {
+.winning-fade-leave-to {
   opacity: 0;
+  transform: scale(1.2);
 }
 
-.notification-enter-active,
-.notification-leave-active {
-  transition: all 0.3s ease;
-}
-
-.notification-enter-from,
-.notification-leave-to {
-  opacity: 0;
-  transform: translateX(100%);
-}
-
-.notification-move {
-  transition: transform 0.3s ease;
-}
-
-/* 响应式设计 */
+/* 响应式适配 */
 @media (max-width: 768px) {
-  .notification-container {
-    top: 10px;
-    right: 10px;
-    left: 10px;
-  }
-
-  .notification-item {
-    min-width: auto;
-    max-width: none;
+  .overlay-system {
+    /* 移动端适配 */
   }
 }
 </style>

@@ -97,11 +97,10 @@ const displayData = computed(() => {
 
 // 方法
 const handleBetClick = () => {
-  // 无任何限制，直接执行投注
-  const result = bettingStore.placeBet(ZONE_ID, bettingStore.selectedChip)
+  // 🔥 不传入任何参数，让 placeBet 使用当前选中筹码
+  const result = bettingStore.placeBet(ZONE_ID)
 
   if (result.success) {
-    console.log('庄投注成功:', result.amount)
     showStatusMessage(result.message, 'success')
 
     // 触觉反馈
@@ -109,10 +108,8 @@ const handleBetClick = () => {
       navigator.vibrate(50)
     }
 
-    // 简化点击动画
     animateClick()
   } else {
-    console.log('庄投注失败:', result.message)
     showStatusMessage(result.message, 'error')
   }
 }

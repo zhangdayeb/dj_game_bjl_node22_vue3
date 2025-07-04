@@ -254,18 +254,8 @@ const formatAmount = (amount: number): string => {
 // 🔥 关键修复：筹码选择事件处理
 const handleChipSelect = (chip: ChipData) => {
   try {
-    // 🔥 确保传递的是筹码的值而不是对象
-    const chipValue = chip.value
-    bettingStore?.selectChip?.(chipValue)
-    console.log(`🎯 选择筹码: ${chipValue}`)
-
-    // 🔥 添加调试信息
-    console.log('🔍 筹码选择调试信息:', {
-      选中的筹码对象: chip,
-      筹码值: chipValue,
-      当前选中筹码: bettingStore?.selectedChip,
-      显示筹码列表: displayChips.value.map(c => ({ id: c.id, value: c.value }))
-    })
+    // 🔥 直接调用 selectChip，确保状态同步
+    bettingStore?.selectChip?.(chip.value)
 
     // 🔥 添加触觉反馈
     if (navigator.vibrate) {
@@ -349,7 +339,6 @@ watch(displayChips, (newChips) => {
     if (!isCurrentChipInList) {
       console.log(`⚠️ 当前选中筹码 ${currentSelectedChip} 不在新的显示列表中`)
       console.log('🔄 可选筹码:', newChips.map(c => c.value))
-      // 这里不主动修改，让 bettingStore.updateDisplayChips 处理
     }
   }
 }, { immediate: true, deep: true })

@@ -1,6 +1,6 @@
 // src/stores/bettingStore.ts - 最终修复版：兼容所有组件
 import { defineStore } from 'pinia'
-import { ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, nextTick  } from 'vue'
 
 // 百家乐投注类型
 export type BaccaratBetType =
@@ -408,22 +408,16 @@ export const useBettingStore = defineStore('betting', () => {
     }
   }
 
+
   // 执行投注
-  const placeBet = (betType: BaccaratBetType, amount: number): BetResult => {
+  const placeBet = (betType: BaccaratBetType, amount?: number): BetResult => {
     // 检查游戏状态
     if (gamePhase.value !== 'betting') {
       return { success: false, message: '当前不在投注阶段' }
     }
 
-    // 🔥 关键修复：确保使用当前选中的筹码值
-    const actualAmount = typeof amount === 'number' ? amount : selectedChipRef.value
-    console.log(`🎯 投注详情:`, {
-      betType,
-      传入金额: amount,
-      实际使用金额: actualAmount,
-      当前选中筹码: selectedChipRef.value,
-      显示筹码列表: displayChips.value.map(c => c.value)
-    })
+    // 🔥 强制使用当前选中的筹码值，忽略传入参数
+    const actualAmount = selectedChipRef.value
 
     // 计算投注金额
     const result = calculateBetAmount(betType, actualAmount)
@@ -445,7 +439,6 @@ export const useBettingStore = defineStore('betting', () => {
       timestamp: Date.now()
     })
 
-    console.log(`✅ 投注成功: ${betType} +${finalAmount}`)
     return result
   }
 
@@ -518,11 +511,8 @@ export const useBettingStore = defineStore('betting', () => {
     const validChips = chips.slice(0, 3)
 
     if (validChips.length === 0) {
-      console.warn('⚠️ 未提供有效筹码，使用默认筹码')
       displayChips.value = [...DEFAULT_DISPLAY_CHIPS]
-      // 🔥 新增：自动选择第一个默认筹码
       selectedChipRef.value = DEFAULT_DISPLAY_CHIPS[0].value
-      console.log(`🎯 自动选择默认筹码: ${selectedChipRef.value}`)
       return
     }
 
@@ -538,24 +528,20 @@ export const useBettingStore = defineStore('betting', () => {
       }
     }
 
-    // 🔥 关键修复：更新前保存当前选中筹码
-    const currentSelectedChip = selectedChipRef.value
+    // 🔥 强制刷新：先清空再设置，触发响应式更新
+    displayChips.value = []
+    nextTick(() => {
+      displayChips.value = validChips
 
-    // 更新显示筹码
-    displayChips.value = validChips
-    console.log('✅ 更新显示筹码:', displayChips.value.map(c => c.value))
-
-    // 🔥 关键修复：检查当前选中的筹码是否还在新的显示列表中
-    const isCurrentChipInNewList = validChips.some(chip => chip.value === currentSelectedChip)
-
-    if (!isCurrentChipInNewList) {
-      // 如果当前选中的筹码不在新列表中，自动选择第一个
+      // 🔥 强制选择第一个筹码，确保同步
       selectedChipRef.value = validChips[0].value
-      console.log(`🎯 当前筹码 ${currentSelectedChip} 不在新列表中，自动选择第一个: ${selectedChipRef.value}`)
-    } else {
-      // 如果在新列表中，保持当前选择
-      console.log(`🎯 保持当前选中筹码: ${selectedChipRef.value}`)
-    }
+
+      // 🔥 强制触发响应式更新
+      nextTick(() => {
+        // 确保所有组件都能获取到最新值
+        console.log(`✅ 强制更新完成: 选中筹码=${selectedChipRef.value}, 显示筹码=[${validChips.map(c => c.value).join(',')}]`)
+      })
+    })
   }
 
   // 🔥 修改：根据余额智能推荐显示筹码
@@ -664,12 +650,18 @@ export const useBettingStore = defineStore('betting', () => {
 
   // 🔥 关键修复：选择筹码方法 - 统一接口
   const selectChip = (amount: number): void => {
-    const chip = availableChips.value.find(c => c.value === amount)
-    if (chip) {
+    // 🔥 验证筹码是否在当前显示列表中
+    const isValidChip = displayChips.value.some(chip => chip.value === amount)
+
+    if (isValidChip) {
       selectedChipRef.value = amount
-      console.log(`✅ 选择筹码: ${amount}`)
     } else {
-      console.warn(`⚠️ 未找到值为 ${amount} 的筹码`)
+      // 如果选择的筹码不在显示列表中，自动选择第一个
+      if (displayChips.value.length > 0) {
+        selectedChipRef.value = displayChips.value[0].value
+      } else {
+        selectedChipRef.value = 10 // 默认值
+      }
     }
   }
 

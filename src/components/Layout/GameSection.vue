@@ -16,7 +16,7 @@
         <!-- 欢迎界面 -->
         <div v-else class="welcome-section">
           <div class="welcome-content">
-            <h1 class="welcome-title">欢迎</h1>
+            <h1 class="welcome-title">欢迎光临百家乐游戏</h1>
             <button
               class="welcome-button"
               @click="handleWelcomeClick"

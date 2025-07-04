@@ -1,5 +1,5 @@
 // src/services/gameApi.ts
-// 极简版百家乐游戏 API 服务 - 只保留4个核心功能
+// 极简版百家乐游戏 API 服务 - 只保留4个核心功能 + 新增统计接口
 
 import { httpClient, setAuthToken } from './httpClient'
 
@@ -154,6 +154,16 @@ export interface BetResponse {
   bets: BetRequest[]                       // 投注详情
 }
 
+// 🔥 5. 新增：台桌统计接口 - 基于后端 get_table_count 方法
+export interface TableStatisticsResponse {
+  zhuang: number                           // 庄的次数
+  xian: number                             // 闲的次数
+  he: number                               // 和的次数
+  zhuangDui: number                        // 庄对的次数（包含庄闲对）
+  xianDui: number                          // 闲对的次数（包含庄闲对）
+  zhuangXianDui: number                    // 庄闲对的次数
+}
+
 export class GameApiService {
   private gameParams: GameParams
 
@@ -223,6 +233,41 @@ export class GameApiService {
 
     const response = await httpClient.post<BetResponse>('/bjl/bet/order', requestData)
     return response
+  }
+
+  /**
+   * 🔥 5. 新增：获取当前靴的统计信息（庄闲和次数等）
+   * 对应后端路由：bjl/get_table/get_table_count
+   * 对应后端方法：get_table_count()
+   * 自动使用当前台桌信息中的靴号
+   */
+  async getCurrentShoeStatistics(): Promise<TableStatisticsResponse> {
+    try {
+      // 先获取台桌信息以获得当前靴号
+      const tableInfo = await this.getTableInfo()
+
+      // 构建请求参数，确保包含后端需要的所有必填参数
+      const requestParams = {
+        tableId: this.gameParams.table_id,               // 台桌ID（必填）
+        xue: tableInfo.num_xue,                          // 当前靴号（必填）
+        gameType: this.gameParams.game_type              // 游戏类型（必填）
+      }
+
+      const response = await httpClient.get<TableStatisticsResponse>('/bjl/get_table/get_table_count', requestParams)
+
+      // 确保返回的数据结构完整
+      return {
+        zhuang: response.zhuang || 0,
+        xian: response.xian || 0,
+        he: response.he || 0,
+        zhuangDui: response.zhuangDui || 0,
+        xianDui: response.xianDui || 0,
+        zhuangXianDui: response.zhuangXianDui || 0
+      }
+    } catch (error) {
+      console.error('获取当前靴统计信息失败:', error)
+      throw error
+    }
   }
 
   /**

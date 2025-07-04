@@ -1,11 +1,11 @@
 <template>
   <div
-    class="bet-zone lucky6-zone"
+    class="bet-zone lucky6-zone first-row-zone"
     :class="{
       'active': hasActiveBet,
-      'disabled': isDisabled,
       'winning': isWinning,
-      'losing': isLosing
+      'losing': isLosing,
+      'can-bet': canPlaceBet
     }"
     @click="handleBetClick"
   >
@@ -18,18 +18,8 @@
       <div class="bet-amount" v-if="betAmount > 0">
         ${{ formatAmount(betAmount) }}
       </div>
-      <div class="player-count" v-if="playerCount > 0">
-        <span class="count-icon">👥</span>
-        {{ playerCount }}
-      </div>
-    </div>
-
-    <!-- 筹码显示 -->
-    <div class="chips-container" v-if="betAmount > 0">
-      <div class="chip-stack">
-        <div class="chip" v-for="(chip, index) in displayChips" :key="index">
-          {{ chip }}
-        </div>
+      <div class="no-bet-placeholder" v-else>
+        -
       </div>
     </div>
 
@@ -37,24 +27,31 @@
     <div class="win-effect" v-if="showWinEffect">
       <div class="win-amount">+${{ formatAmount(winAmount) }}</div>
     </div>
+
+    <!-- 状态提示 -->
+    <div class="bet-status-indicator" v-if="statusMessage">
+      {{ statusMessage }}
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
+import { useGameStore } from '@/stores/gameStore'
 
 const bettingStore = useBettingStore()
+const gameStore = useGameStore()
 
 // 投注区域ID
-const ZONE_ID = 'lucky6'
+const ZONE_ID = 'lucky-6'
 
 // 响应式数据
 const isWinning = ref(false)
 const isLosing = ref(false)
 const showWinEffect = ref(false)
 const winAmount = ref(0)
-const playerCount = ref(0)
+const statusMessage = ref('')
 
 // 计算属性
 const betAmount = computed(() => {
@@ -65,33 +62,46 @@ const hasActiveBet = computed(() => {
   return betAmount.value > 0
 })
 
-const isDisabled = computed(() => {
-  return bettingStore.gamePhase !== 'betting' || bettingStore.balance < bettingStore.selectedChip
-})
-
-const displayChips = computed((): number[] => {
-  if (betAmount.value <= 0) return []
-
-  const chips: number[] = []
-  let remaining = betAmount.value
-  const chipValues: readonly number[] = [100, 50, 25, 10, 5, 1]
-
-  for (const value of chipValues) {
-    while (remaining >= value && chips.length < 5) {
-      chips.push(value)
-      remaining -= value
-    }
-  }
-
-  return chips
+const canPlaceBet = computed(() => {
+  return gameStore.canBet || gameStore.gameState?.status === 'betting'
 })
 
 // 方法
 const handleBetClick = () => {
-  if (isDisabled.value) return
+  // 检查是否可以投注
+  if (!canPlaceBet.value) {
+    const gameStatus = gameStore.gameState?.status
+    let message = ''
 
+    switch (gameStatus) {
+      case 'dealing':
+        message = '开牌中，暂停投注'
+        break
+      case 'result':
+        message = '结果公布中，暂停投注'
+        break
+      case 'waiting':
+        message = '等待新局开始'
+        break
+      default:
+        message = '当前不可投注'
+    }
+
+    showStatusMessage(message)
+    return
+  }
+
+  // 检查余额
+  if (bettingStore.balance < bettingStore.selectedChip) {
+    showStatusMessage('余额不足')
+    return
+  }
+
+  // 执行投注
   const success = bettingStore.placeBet(ZONE_ID, bettingStore.selectedChip)
   if (success) {
+    console.log('幸运6投注成功:', bettingStore.selectedChip)
+
     // 触觉反馈
     if (navigator.vibrate) {
       navigator.vibrate(50)
@@ -99,6 +109,8 @@ const handleBetClick = () => {
 
     // 点击动画
     animateClick()
+  } else {
+    showStatusMessage('投注失败')
   }
 }
 
@@ -113,12 +125,17 @@ const animateClick = () => {
 }
 
 const formatAmount = (amount: number | undefined | null): string => {
-  // 参数验证和默认值处理
   if (amount === undefined || amount === null || isNaN(amount)) {
-    return '0'  // 或者返回 '---' 或其他默认显示
+    return '0'
   }
-
   return amount.toLocaleString()
+}
+
+const showStatusMessage = (message: string) => {
+  statusMessage.value = message
+  setTimeout(() => {
+    statusMessage.value = ''
+  }, 2000)
 }
 
 const showWinAnimation = (amount: number) => {
@@ -134,76 +151,55 @@ const showWinAnimation = (amount: number) => {
 
 const showLoseAnimation = () => {
   isLosing.value = true
-
   setTimeout(() => {
     isLosing.value = false
   }, 2000)
 }
-
-// 监听游戏结果
-onMounted(() => {
-  // 模拟玩家数量变化
-  const updatePlayerCount = () => {
-    playerCount.value = Math.floor(Math.random() * 12) + 1
-  }
-
-  updatePlayerCount()
-  const interval = setInterval(updatePlayerCount, 30000)
-
-  onUnmounted(() => {
-    clearInterval(interval)
-  })
-})
 </script>
 
 <style scoped>
-.bet-zone {
+/* 第一排边注区域样式 */
+.first-row-zone {
   position: relative;
   background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
   border: 2px solid #9b59b6;
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: 6px;
   cursor: pointer;
   transition: all 0.3s ease;
-  min-height: 120px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  font-size: 12px;
 }
 
-.bet-zone:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(155, 89, 182, 0.3);
+.first-row-zone:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(155, 89, 182, 0.4);
   border-color: #bb8fce;
 }
 
-.bet-zone.active {
+.first-row-zone.active {
   border-color: #f39c12;
-  background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
-  box-shadow: 0 0 20px rgba(243, 156, 18, 0.5);
+  background: linear-gradient(135deg, #f39c12 0%, #9b59b6 100%);
+  box-shadow: 0 0 15px rgba(243, 156, 18, 0.6);
 }
 
-.bet-zone.disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  filter: grayscale(30%);
-}
-
-.bet-zone.winning {
+.first-row-zone.winning {
   background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
   border-color: #2ecc71;
   animation: winPulse 2s ease-in-out infinite;
 }
 
-.bet-zone.losing {
+.first-row-zone.losing {
   background: linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%);
   border-color: #95a5a6;
   animation: losePulse 1s ease-in-out 3;
 }
 
-.bet-zone.clicked {
+.first-row-zone.clicked {
   animation: clickPulse 0.2s ease-out;
 }
 
@@ -211,80 +207,48 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .zone-title {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: bold;
   color: #ffffff;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .zone-odds {
-  font-size: 12px;
+  font-size: 8px;
   color: #f1c40f;
   font-weight: 600;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 4px 6px;
-  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 3px;
+  border-radius: 6px;
   border: 1px solid rgba(241, 196, 15, 0.3);
 }
 
 .bet-info {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 8px;
+  min-height: 18px;
+  flex: 1;
 }
 
 .bet-amount {
-  font-size: 16px;
+  font-size: 11px;
   font-weight: bold;
-  color: #f39c12;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-.player-count {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #bdc3c7;
-}
-
-.count-icon {
-  font-size: 10px;
-}
-
-.chips-container {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  pointer-events: none;
-}
-
-.chip-stack {
-  display: flex;
-  flex-direction: column-reverse;
-  align-items: center;
-  gap: 2px;
-}
-
-.chip {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #f39c12 0%, #e67e22 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: bold;
-  color: white;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  border: 2px solid #ffffff;
+.no-bet-placeholder {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 300;
 }
 
 .win-effect {
@@ -297,19 +261,33 @@ onMounted(() => {
 }
 
 .win-amount {
-  font-size: 20px;
+  font-size: 12px;
   font-weight: bold;
   color: #f39c12;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
 }
 
+.bet-status-indicator {
+  position: absolute;
+  bottom: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: #f39c12;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  white-space: nowrap;
+  z-index: 100;
+}
+
 /* 动画效果 */
 @keyframes winPulse {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(243, 156, 18, 0.5);
+    box-shadow: 0 0 15px rgba(46, 204, 113, 0.5);
   }
   50% {
-    box-shadow: 0 0 30px rgba(243, 156, 18, 0.8);
+    box-shadow: 0 0 25px rgba(46, 204, 113, 0.8);
   }
 }
 
@@ -347,21 +325,40 @@ onMounted(() => {
 
 /* 响应式适配 */
 @media (max-width: 768px) {
-  .bet-zone {
-    padding: 8px;
-    min-height: 100px;
-  }
-
-  .zone-title {
-    font-size: 14px;
-  }
-
-  .zone-odds {
+  .first-row-zone {
+    padding: 4px;
     font-size: 11px;
   }
 
+  .zone-title {
+    font-size: 11px;
+  }
+
+  .zone-odds {
+    font-size: 7px;
+  }
+
   .bet-amount {
-    font-size: 14px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .first-row-zone {
+    padding: 3px;
+    font-size: 10px;
+  }
+
+  .zone-title {
+    font-size: 10px;
+  }
+
+  .zone-odds {
+    font-size: 6px;
+  }
+
+  .bet-amount {
+    font-size: 9px;
   }
 }
 </style>

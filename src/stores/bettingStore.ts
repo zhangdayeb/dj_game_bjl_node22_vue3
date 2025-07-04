@@ -1,4 +1,4 @@
-// src/stores/bettingStore.ts - 基于上传文件修正版本
+// src/stores/bettingStore.ts - 完整修复版
 import { defineStore } from 'pinia'
 import { ref, computed, reactive } from 'vue'
 
@@ -22,25 +22,161 @@ export interface ChipData {
   displayValue: string
 }
 
+// 筹码图片映射 - 统一管理
+export const CHIP_IMAGE_MAP: Record<number, string> = {
+  1: '/images/chips/1.png',
+  5: '/images/chips/5.png',
+  10: '/images/chips/10.png',
+  25: '/images/chips/25.png',
+  50: '/images/chips/50.png',
+  100: '/images/chips/100.png',
+  500: '/images/chips/500.png',
+  1000: '/images/chips/1000.png'
+}
+
+// 投注区域配置
+interface BetZoneConfig {
+  id: BaccaratBetType
+  rateId: number
+  displayName: string
+  odds: string
+  minBetField: string
+  maxBetField: string
+  simulationConfig: {
+    playerCountRange: [number, number]
+    amountRange: [number, number]
+    increaseInterval: number
+  }
+}
+
+// 投注区域配置映射
+export const BET_ZONE_CONFIGS: Record<BaccaratBetType, BetZoneConfig> = {
+  'banker': {
+    id: 'banker',
+    rateId: 8,
+    displayName: '庄',
+    odds: '1:0.95',
+    minBetField: 'bjl_xian_hong_zhuang_min',
+    maxBetField: 'bjl_xian_hong_zhuang_max',
+    simulationConfig: {
+      playerCountRange: [15, 40],
+      amountRange: [8000, 50000],
+      increaseInterval: 3000
+    }
+  },
+  'player': {
+    id: 'player',
+    rateId: 6,
+    displayName: '闲',
+    odds: '1:1',
+    minBetField: 'bjl_xian_hong_xian_min',
+    maxBetField: 'bjl_xian_hong_xian_max',
+    simulationConfig: {
+      playerCountRange: [12, 35],
+      amountRange: [6000, 45000],
+      increaseInterval: 3000
+    }
+  },
+  'tie': {
+    id: 'tie',
+    rateId: 7,
+    displayName: '和',
+    odds: '1:8',
+    minBetField: 'bjl_xian_hong_he_min',
+    maxBetField: 'bjl_xian_hong_he_max',
+    simulationConfig: {
+      playerCountRange: [3, 15],
+      amountRange: [1000, 15000],
+      increaseInterval: 3000
+    }
+  },
+  'banker-pair': {
+    id: 'banker-pair',
+    rateId: 4,
+    displayName: '庄对',
+    odds: '1:11',
+    minBetField: 'bjl_xian_hong_zhuang_dui_min',
+    maxBetField: 'bjl_xian_hong_zhuang_dui_max',
+    simulationConfig: {
+      playerCountRange: [5, 20],
+      amountRange: [500, 8000],
+      increaseInterval: 3000
+    }
+  },
+  'player-pair': {
+    id: 'player-pair',
+    rateId: 2,
+    displayName: '闲对',
+    odds: '1:11',
+    minBetField: 'bjl_xian_hong_xian_dui_min',
+    maxBetField: 'bjl_xian_hong_xian_dui_max',
+    simulationConfig: {
+      playerCountRange: [4, 18],
+      amountRange: [400, 7000],
+      increaseInterval: 3000
+    }
+  },
+  'lucky-6': {
+    id: 'lucky-6',
+    rateId: 3,
+    displayName: '幸运6',
+    odds: '1:12/20',
+    minBetField: 'bjl_xian_hong_lucky6_min',
+    maxBetField: 'bjl_xian_hong_lucky6_max',
+    simulationConfig: {
+      playerCountRange: [2, 12],
+      amountRange: [200, 5000],
+      increaseInterval: 3000
+    }
+  },
+  'dragon-7': {
+    id: 'dragon-7',
+    rateId: 9,
+    displayName: '龙7',
+    odds: '1:40',
+    minBetField: 'bjl_xian_hong_long7_min',
+    maxBetField: 'bjl_xian_hong_long7_max',
+    simulationConfig: {
+      playerCountRange: [1, 8],
+      amountRange: [100, 3000],
+      increaseInterval: 3000
+    }
+  },
+  'panda-8': {
+    id: 'panda-8',
+    rateId: 10,
+    displayName: '熊8',
+    odds: '1:25',
+    minBetField: 'bjl_xian_hong_xiong8_min',
+    maxBetField: 'bjl_xian_hong_xiong8_max',
+    simulationConfig: {
+      playerCountRange: [1, 10],
+      amountRange: [100, 4000],
+      increaseInterval: 3000
+    }
+  }
+}
+
 // 所有可用筹码
 export const AVAILABLE_CHIPS: ChipData[] = [
-  { id: 'chip-1', value: 1, name: '1元', image: '/src/assets/images/chips/1.png', displayValue: '1' },
-  { id: 'chip-5', value: 5, name: '5元', image: '/src/assets/images/chips/5.png', displayValue: '5' },
-  { id: 'chip-10', value: 10, name: '10元', image: '/src/assets/images/chips/10.png', displayValue: '10' },
-  { id: 'chip-25', value: 25, name: '25元', image: '/src/assets/images/chips/25.png', displayValue: '25' },
-  { id: 'chip-50', value: 50, name: '50元', image: '/src/assets/images/chips/50.png', displayValue: '50' },
-  { id: 'chip-100', value: 100, name: '100元', image: '/src/assets/images/chips/100.png', displayValue: '100' },
-  { id: 'chip-500', value: 500, name: '500元', image: '/src/assets/images/chips/500.png', displayValue: '500' },
-  { id: 'chip-1000', value: 1000, name: '1000元', image: '/src/assets/images/chips/1000.png', displayValue: '1K' }
+  { id: 'chip-1', value: 1, name: '1元', image: CHIP_IMAGE_MAP[1], displayValue: '1' },
+  { id: 'chip-5', value: 5, name: '5元', image: CHIP_IMAGE_MAP[5], displayValue: '5' },
+  { id: 'chip-10', value: 10, name: '10元', image: CHIP_IMAGE_MAP[10], displayValue: '10' },
+  { id: 'chip-25', value: 25, name: '25元', image: CHIP_IMAGE_MAP[25], displayValue: '25' },
+  { id: 'chip-50', value: 50, name: '50元', image: CHIP_IMAGE_MAP[50], displayValue: '50' },
+  { id: 'chip-100', value: 100, name: '100元', image: CHIP_IMAGE_MAP[100], displayValue: '100' },
+  { id: 'chip-500', value: 500, name: '500元', image: CHIP_IMAGE_MAP[500], displayValue: '500' },
+  { id: 'chip-1000', value: 1000, name: '1000元', image: CHIP_IMAGE_MAP[1000], displayValue: '1K' }
 ]
 
 // 投注区域模拟数据
 interface BetZoneData {
-  totalAmount: number    // 总投注金额
-  playerCount: number    // 投注人数
+  totalAmount: number
+  playerCount: number
+  userAmount: number  // 用户投注金额
 }
 
-// 投注历史记录（用于撤销）
+// 投注历史记录
 interface BetHistoryStep {
   betType: BaccaratBetType
   amount: number
@@ -48,15 +184,33 @@ interface BetHistoryStep {
   timestamp: number
 }
 
+// 投注结果
+interface BetResult {
+  success: boolean
+  amount?: number
+  message: string
+}
+
+// 限红配置（从台桌信息获取）
+interface BetLimits {
+  [key: string]: {
+    min: number
+    max: number
+  }
+}
+
 // 默认筹码（保持兼容性）
 export const DEFAULT_CHIPS = [1, 5, 10, 50, 100] as const
 
 export const useBettingStore = defineStore('betting', () => {
-  // 1. 撤销操作数据
-  const betHistory = ref<BetHistoryStep[]>([])
+  // 基础状态
+  const selectedChip = ref(10)
+  const balance = ref(10000)
+  const gamePhase = ref<'waiting' | 'betting' | 'dealing' | 'result'>('betting')
+  const isCommissionFree = ref(false)
 
-  // 2. 上一局投注数据
-  const lastRoundBets = ref<Record<BaccaratBetType, number>>({
+  // 投注数据
+  const currentBets = reactive<Record<BaccaratBetType, number>>({
     'banker': 0,
     'player': 0,
     'tie': 0,
@@ -67,118 +221,295 @@ export const useBettingStore = defineStore('betting', () => {
     'panda-8': 0
   })
 
-  // 3. 当前选中筹码
-  const selectedChip = ref(10)
+  // 投注历史（用于撤销）
+  const betHistory = ref<BetHistoryStep[]>([])
 
-  // 4. 筹码选择器相关状态
+  // 上一局投注数据（用于重复投注）
+  const lastBets = reactive<Record<BaccaratBetType, number>>({
+    'banker': 0,
+    'player': 0,
+    'tie': 0,
+    'banker-pair': 0,
+    'player-pair': 0,
+    'lucky-6': 0,
+    'dragon-7': 0,
+    'panda-8': 0
+  })
+
+  // 模拟数据
+  const simulationData = reactive<Record<BaccaratBetType, BetZoneData>>({
+    'banker': { totalAmount: 12580, playerCount: 23, userAmount: 0 },
+    'player': { totalAmount: 8960, playerCount: 18, userAmount: 0 },
+    'tie': { totalAmount: 2340, playerCount: 6, userAmount: 0 },
+    'banker-pair': { totalAmount: 1150, playerCount: 8, userAmount: 0 },
+    'player-pair': { totalAmount: 980, playerCount: 7, userAmount: 0 },
+    'lucky-6': { totalAmount: 650, playerCount: 4, userAmount: 0 },
+    'dragon-7': { totalAmount: 320, playerCount: 3, userAmount: 0 },
+    'panda-8': { totalAmount: 280, playerCount: 2, userAmount: 0 }
+  })
+
+  // 限红配置（默认值，实际从台桌信息获取）
+  const betLimits = ref<BetLimits>({
+    'banker': { min: 10, max: 50000 },
+    'player': { min: 10, max: 50000 },
+    'tie': { min: 10, max: 10000 },
+    'banker-pair': { min: 10, max: 5000 },
+    'player-pair': { min: 10, max: 5000 },
+    'lucky-6': { min: 10, max: 3000 },
+    'dragon-7': { min: 10, max: 1000 },
+    'panda-8': { min: 10, max: 2000 }
+  })
+
+  // 筹码相关状态
   const displayChips = ref<string[]>(['chip-10', 'chip-50', 'chip-100'])
   const availableChips = ref(AVAILABLE_CHIPS)
 
-  // 5. 投注区域模拟数据
-  const zoneSimulationData = reactive<Record<BaccaratBetType, BetZoneData>>({
-    'banker': { totalAmount: 12580, playerCount: 23 },
-    'player': { totalAmount: 8960, playerCount: 18 },
-    'tie': { totalAmount: 2340, playerCount: 6 },
-    'banker-pair': { totalAmount: 1150, playerCount: 8 },
-    'player-pair': { totalAmount: 980, playerCount: 7 },
-    'lucky-6': { totalAmount: 650, playerCount: 4 },
-    'dragon-7': { totalAmount: 320, playerCount: 3 },
-    'panda-8': { totalAmount: 280, playerCount: 2 }
+  // 模拟数据更新定时器
+  const simulationTimers = ref<Record<BaccaratBetType, NodeJS.Timeout | null>>({
+    'banker': null,
+    'player': null,
+    'tie': null,
+    'banker-pair': null,
+    'player-pair': null,
+    'lucky-6': null,
+    'dragon-7': null,
+    'panda-8': null
   })
 
-  // 6. 用户投注金额
-  const userBets = reactive<Record<BaccaratBetType, number>>({
-    'banker': 0,
-    'player': 0,
-    'tie': 0,
-    'banker-pair': 0,
-    'player-pair': 0,
-    'lucky-6': 0,
-    'dragon-7': 0,
-    'panda-8': 0
+  // 计算属性
+  const totalBetAmount = computed(() => {
+    return Object.values(currentBets).reduce((sum, amount) => sum + amount, 0)
   })
 
-  // 🔥 关键修正：添加 currentBets 别名，指向 userBets
-  const currentBets = computed(() => userBets)
-
-  // 7. 中奖闪烁状态
-  const winningFlash = reactive<Record<BaccaratBetType, boolean>>({
-    'banker': false,
-    'player': false,
-    'tie': false,
-    'banker-pair': false,
-    'player-pair': false,
-    'lucky-6': false,
-    'dragon-7': false,
-    'panda-8': false
+  const hasActiveBets = computed(() => {
+    return totalBetAmount.value > 0
   })
-
-  // 8. 免佣状态
-  const isCommissionFree = ref(false)
-
-  // 9. 🔥 新增：余额和游戏状态
-  const balance = ref(10000)
-  const gamePhase = ref<'waiting' | 'betting' | 'dealing' | 'result'>('betting')
-
-  // 📊 计算属性
-  const totalUserBets = computed(() => {
-    return Object.values(userBets).reduce((sum, amount) => sum + amount, 0)
-  })
-
-  // 🔥 新增：为了兼容性，添加 totalBetAmount 别名
-  const totalBetAmount = computed(() => totalUserBets.value)
 
   const hasLastRoundData = computed(() => {
-    return Object.values(lastRoundBets.value).some(amount => amount > 0)
+    return Object.values(lastBets).some(amount => amount > 0)
   })
 
-  // 获取显示的筹码数据
   const getDisplayChipsData = computed(() => {
     return availableChips.value.filter(chip =>
       displayChips.value.includes(chip.id)
     )
   })
 
-  // 获取当前筹码数据
-  const getCurrentChipData = computed(() => {
-    return availableChips.value.find(chip => chip.value === selectedChip.value)
-  })
+  // 获取筹码图片数组（用于显示）
+  const getChipImages = (amount: number): Array<{value: number, image: string}> => {
+    if (amount <= 0) return []
 
-  // 检查筹码是否可用
-  const isChipAvailable = computed(() => {
-    return (chipValue: number) => {
-      return availableChips.value.some(chip => chip.value === chipValue)
+    const chips: Array<{value: number, image: string}> = []
+    let remaining = amount
+    const chipValues = [1000, 500, 100, 50, 25, 10, 5, 1]
+
+    for (const value of chipValues) {
+      while (remaining >= value && chips.length < 6) {
+        chips.push({
+          value,
+          image: CHIP_IMAGE_MAP[value] || '/images/chips/default.png'
+        })
+        remaining -= value
+      }
     }
-  })
 
-  // 🔥 新增：投注操作方法
-  const placeBet = (betType: BaccaratBetType, amount: number): boolean => {
+    return chips
+  }
+
+  // 计算投注金额（包含限红和余额检查）
+  const calculateBetAmount = (betType: BaccaratBetType, selectedAmount: number): BetResult => {
+    const limits = betLimits.value[betType]
+    const zoneName = BET_ZONE_CONFIGS[betType].displayName
+
+    if (!limits) {
+      return { success: false, message: '投注区域配置错误' }
+    }
+
+    let finalAmount = selectedAmount
+    let adjustmentMessage = ''
+
+    // 1. 余额检查
+    if (finalAmount > balance.value) {
+      finalAmount = balance.value
+      adjustmentMessage = `按可用余额投注 $${balance.value.toLocaleString()}`
+    }
+
+    // 2. 最终检查：如果最小限红 > 余额，则投注失败
+    if (limits.min > balance.value) {
+      return {
+        success: false,
+        message: `余额不足，${zoneName}最小投注为 $${limits.min.toLocaleString()}，当前余额 $${balance.value.toLocaleString()}`
+      }
+    }
+
+    // 3. 限红检查
+    if (finalAmount < limits.min) {
+      finalAmount = limits.min
+      adjustmentMessage = `投注金额已调整至最小限红 $${limits.min.toLocaleString()}`
+    }
+
+    if (finalAmount > limits.max) {
+      finalAmount = limits.max
+      adjustmentMessage = `投注金额已调整至最大限红 $${limits.max.toLocaleString()}`
+    }
+
+    return {
+      success: true,
+      amount: finalAmount,
+      message: adjustmentMessage || `投注成功：${zoneName} $${finalAmount.toLocaleString()}`
+    }
+  }
+
+  // 执行投注
+  const placeBet = (betType: BaccaratBetType, amount: number): BetResult => {
+    // 检查游戏状态
     if (gamePhase.value !== 'betting') {
-      console.warn('当前不在投注阶段')
-      return false
+      return { success: false, message: '当前不在投注阶段' }
     }
 
-    if (balance.value < amount) {
-      console.warn('余额不足')
-      return false
+    // 计算投注金额
+    const result = calculateBetAmount(betType, amount)
+    if (!result.success) {
+      return result
     }
 
-    // 添加投注
-    userBets[betType] += amount
+    const finalAmount = result.amount!
 
-    // 记录到历史
+    // 执行投注
+    currentBets[betType] += finalAmount
+    simulationData[betType].userAmount = currentBets[betType]
+
+    // 记录历史
     betHistory.value.push({
       betType,
-      amount,
+      amount: finalAmount,
       action: 'add',
       timestamp: Date.now()
     })
 
-    console.log(`✅ 投注成功: ${betType} +${amount}`)
+    console.log(`✅ 投注成功: ${betType} +${finalAmount}`)
+    return result
+  }
+
+  // 撤销投注
+  const undoLastBet = (): boolean => {
+    if (betHistory.value.length === 0) {
+      return false
+    }
+
+    const lastStep = betHistory.value.pop()!
+    const { betType, amount, action } = lastStep
+
+    if (action === 'add') {
+      currentBets[betType] = Math.max(0, currentBets[betType] - amount)
+    } else {
+      currentBets[betType] += amount
+    }
+
+    // 更新模拟数据
+    simulationData[betType].userAmount = currentBets[betType]
+
+    console.log(`↩️ 撤销操作: ${betType} ${action} ${amount}`)
     return true
   }
 
-  // 🔧 核心方法
+  // 重复上局投注
+  const repeatLastBets = (): boolean => {
+    if (!hasLastRoundData.value) {
+      return false
+    }
+
+    // 清空当前投注
+    clearAllBets()
+
+    // 恢复上局投注
+    let hasSuccess = false
+    Object.entries(lastBets).forEach(([betType, amount]) => {
+      if (amount > 0) {
+        const result = placeBet(betType as BaccaratBetType, amount)
+        if (result.success) {
+          hasSuccess = true
+        }
+      }
+    })
+
+    return hasSuccess
+  }
+
+  // 清空所有投注
+  const clearAllBets = (): void => {
+    Object.keys(currentBets).forEach(betType => {
+      const key = betType as BaccaratBetType
+      currentBets[key] = 0
+      simulationData[key].userAmount = 0
+    })
+    betHistory.value = []
+  }
+
+  // 保存当前投注为上局数据
+  const saveCurrentAsLastBets = (): void => {
+    Object.keys(currentBets).forEach(betType => {
+      const key = betType as BaccaratBetType
+      lastBets[key] = currentBets[key]
+    })
+  }
+
+  // 开始模拟数据更新
+  const startSimulationUpdates = (): void => {
+    Object.keys(BET_ZONE_CONFIGS).forEach(betType => {
+      const key = betType as BaccaratBetType
+      const config = BET_ZONE_CONFIGS[key].simulationConfig
+
+      simulationTimers.value[key] = setInterval(() => {
+        const data = simulationData[key]
+
+        // 随机增加人数（1-3人）
+        const playerIncrease = Math.floor(Math.random() * 3) + 1
+        data.playerCount += playerIncrease
+
+        // 随机增加金额
+        const [minAmount, maxAmount] = config.amountRange
+        const amountIncrease = Math.floor(Math.random() * (maxAmount * 0.1)) + (minAmount * 0.1)
+        data.totalAmount += amountIncrease
+
+      }, config.increaseInterval)
+    })
+  }
+
+  // 停止模拟数据更新
+  const stopSimulationUpdates = (): void => {
+    Object.keys(simulationTimers.value).forEach(betType => {
+      const key = betType as BaccaratBetType
+      if (simulationTimers.value[key]) {
+        clearInterval(simulationTimers.value[key]!)
+        simulationTimers.value[key] = null
+      }
+    })
+  }
+
+  // 更新限红配置
+  const updateBetLimits = (tableInfo: any): void => {
+    Object.keys(BET_ZONE_CONFIGS).forEach(betType => {
+      const key = betType as BaccaratBetType
+      const config = BET_ZONE_CONFIGS[key]
+
+      betLimits.value[key] = {
+        min: tableInfo[config.minBetField] || 10,
+        max: tableInfo[config.maxBetField] || 50000
+      }
+    })
+  }
+
+  // 获取投注区域显示数据
+  const getBetZoneDisplayData = (betType: BaccaratBetType) => {
+    const data = simulationData[betType]
+    return {
+      userAmount: currentBets[betType],
+      otherPlayerCount: data.playerCount,
+      otherTotalAmount: data.totalAmount + data.userAmount,
+      chipImages: getChipImages(currentBets[betType])
+    }
+  }
 
   // 选择筹码
   const selectChip = (amount: number): void => {
@@ -186,261 +517,99 @@ export const useBettingStore = defineStore('betting', () => {
     if (chip) {
       selectedChip.value = amount
       console.log(`✅ 选择筹码: ${amount}`)
-    } else {
-      console.warn(`❌ 筹码 ${amount} 不可用`)
     }
-  }
-
-  // 更新显示筹码
-  const updateDisplayChips = (chipIds: string[]): void => {
-    // 验证所有 chipId 都存在
-    const validChipIds = chipIds.filter(id =>
-      availableChips.value.some(chip => chip.id === id)
-    )
-
-    if (validChipIds.length === 0) {
-      console.warn('❌ 没有有效的筹码ID')
-      return
-    }
-
-    displayChips.value = validChipIds
-    console.log(`🎯 更新显示筹码:`, validChipIds)
-
-    // 如果当前选中的筹码不在显示列表中，切换到第一个
-    const currentChipExists = validChipIds.some(id => {
-      const chip = availableChips.value.find(c => c.id === id)
-      return chip?.value === selectedChip.value
-    })
-
-    if (!currentChipExists && validChipIds.length > 0) {
-      const firstChip = availableChips.value.find(c => c.id === validChipIds[0])
-      if (firstChip) {
-        selectedChip.value = firstChip.value
-        console.log(`🔄 自动切换到筹码: ${firstChip.value}`)
-      }
-    }
-  }
-
-  // 根据ID获取筹码数据
-  const getChipById = (id: string): ChipData | undefined => {
-    return availableChips.value.find(chip => chip.id === id)
-  }
-
-  // 根据值获取筹码数据
-  const getChipByValue = (value: number): ChipData | undefined => {
-    return availableChips.value.find(chip => chip.value === value)
-  }
-
-  // 撤销上一步
-  const undoLastBet = (): void => {
-    if (betHistory.value.length === 0) {
-      console.log('❌ 没有可撤销的操作')
-      return
-    }
-
-    const lastStep = betHistory.value.pop()!
-    const { betType, amount, action } = lastStep
-
-    if (action === 'add') {
-      // 撤销加注，减少投注
-      userBets[betType] = Math.max(0, userBets[betType] - amount)
-    } else {
-      // 撤销减注，增加投注
-      userBets[betType] += amount
-    }
-
-    console.log(`↩️ 撤销操作: ${betType} ${action} ${amount}`)
-  }
-
-  // 清空所有投注
-  const clearAllBets = (): void => {
-    // 记录清空操作到历史
-    Object.entries(userBets).forEach(([betType, amount]) => {
-      if (amount > 0) {
-        betHistory.value.push({
-          betType: betType as BaccaratBetType,
-          amount,
-          action: 'remove',
-          timestamp: Date.now()
-        })
-      }
-    })
-
-    // 清空所有投注
-    Object.keys(userBets).forEach(betType => {
-      userBets[betType as BaccaratBetType] = 0
-    })
-
-    console.log('🗑️ 清空所有投注')
-  }
-
-  // 恢复上一局
-  const restoreLastRound = (): void => {
-    if (!hasLastRoundData.value) {
-      console.log('❌ 没有上一局数据')
-      return
-    }
-
-    // 先清空当前投注
-    clearAllBets()
-
-    // 恢复上一局数据
-    Object.entries(lastRoundBets.value).forEach(([betType, amount]) => {
-      if (amount > 0) {
-        userBets[betType as BaccaratBetType] = amount
-        // 记录恢复操作
-        betHistory.value.push({
-          betType: betType as BaccaratBetType,
-          amount,
-          action: 'add',
-          timestamp: Date.now()
-        })
-      }
-    })
-
-    console.log('🔄 恢复上一局投注:', lastRoundBets.value)
-  }
-
-  // 更新模拟数据
-  const updateSimulationData = (betType: BaccaratBetType, data: Partial<BetZoneData>): void => {
-    Object.assign(zoneSimulationData[betType], data)
-    console.log(`📊 更新模拟数据 ${betType}:`, data)
-  }
-
-  // 开始中奖闪烁
-  const startWinningFlash = (betType: BaccaratBetType): void => {
-    winningFlash[betType] = true
-    console.log(`✨ 开始中奖闪烁: ${betType}`)
-
-    // 3秒后自动停止闪烁
-    setTimeout(() => {
-      winningFlash[betType] = false
-      console.log(`🔆 停止中奖闪烁: ${betType}`)
-    }, 3000)
-  }
-
-  // 保存当前局为上一局
-  const saveCurrentRound = (): void => {
-    // 复制当前投注到上一局
-    Object.keys(userBets).forEach(betType => {
-      lastRoundBets.value[betType as BaccaratBetType] = userBets[betType as BaccaratBetType]
-    })
-
-    console.log('💾 保存当前局:', { ...lastRoundBets.value })
   }
 
   // 切换免佣状态
   const toggleCommissionFree = (): void => {
     isCommissionFree.value = !isCommissionFree.value
-    console.log(`🎯 免佣状态: ${isCommissionFree.value ? '开启' : '关闭'}`)
   }
 
-  // 获取总投注额
-  const getTotalBetAmount = (): number => {
-    return totalUserBets.value
-  }
-
-  // 格式化金额显示
-  const formatAmount = (amount: number): string => {
-    // 🔥 修正：添加参数验证
+  // 格式化金额
+  const formatAmount = (amount: number | undefined | null): string => {
     if (amount === undefined || amount === null || isNaN(amount)) {
       return '0'
     }
     return amount.toLocaleString()
   }
 
-  // 添加投注记录到历史（供外部调用）
-  const addBetToHistory = (betType: BaccaratBetType, amount: number): void => {
-    betHistory.value.push({
-      betType,
-      amount,
-      action: 'add',
-      timestamp: Date.now()
-    })
-
-    userBets[betType] += amount
-    console.log(`➕ 添加投注: ${betType} +${amount}`)
-  }
-
-  // 重置筹码设置为默认
-  const resetChipSettings = (): void => {
-    displayChips.value = ['chip-10', 'chip-50', 'chip-100']
-    selectedChip.value = 10
-    console.log('🔄 重置筹码设置为默认')
-  }
-
   // 初始化
   const init = (): void => {
     console.log('🎰 投注 Store 初始化')
 
-    // 重置所有状态
-    betHistory.value = []
+    // 重置状态
     selectedChip.value = 10
-    isCommissionFree.value = false
     balance.value = 10000
     gamePhase.value = 'betting'
+    isCommissionFree.value = false
 
-    // 重置筹码设置
-    displayChips.value = ['chip-10', 'chip-50', 'chip-100']
+    // 清空投注
+    clearAllBets()
 
-    // 重置上一局投注
-    Object.keys(lastRoundBets.value).forEach(betType => {
-      lastRoundBets.value[betType as BaccaratBetType] = 0
+    // 重置上局数据
+    Object.keys(lastBets).forEach(betType => {
+      lastBets[betType as BaccaratBetType] = 0
     })
 
-    // 重置用户投注
-    Object.keys(userBets).forEach(betType => {
-      userBets[betType as BaccaratBetType] = 0
-    })
-
-    // 重置闪烁状态
-    Object.keys(winningFlash).forEach(betType => {
-      winningFlash[betType as BaccaratBetType] = false
-    })
+    // 开始模拟数据更新
+    startSimulationUpdates()
 
     console.log('✅ 投注 Store 初始化完成')
   }
 
+  // 清场（开牌时调用）
+  const clearRound = (): void => {
+    console.log('🧹 执行清场')
+
+    // 保存当前投注为上局
+    saveCurrentAsLastBets()
+
+    // 清空当前投注
+    clearAllBets()
+
+    // 停止模拟数据更新
+    stopSimulationUpdates()
+  }
+
   return {
     // 状态
-    betHistory,
-    lastRoundBets,
     selectedChip,
+    balance,
+    gamePhase,
+    isCommissionFree,
+    currentBets,
+    betHistory,
+    lastBets,
+    simulationData,
+    betLimits,
     displayChips,
     availableChips,
-    zoneSimulationData,
-    userBets,
-    currentBets,      // 🔥 新增：兼容性别名
-    winningFlash,
-    isCommissionFree,
-    balance,          // 🔥 新增
-    gamePhase,        // 🔥 新增
 
     // 计算属性
-    totalUserBets,
-    totalBetAmount,   // 🔥 新增：兼容性别名
+    totalBetAmount,
+    hasActiveBets,
     hasLastRoundData,
     getDisplayChipsData,
-    getCurrentChipData,
-    isChipAvailable,
 
     // 方法
-    selectChip,
-    placeBet,         // 🔥 新增：投注方法
-    updateDisplayChips,
-    getChipById,
-    getChipByValue,
+    placeBet,
     undoLastBet,
+    repeatLastBets,
     clearAllBets,
-    restoreLastRound,
-    updateSimulationData,
-    startWinningFlash,
-    saveCurrentRound,
+    saveCurrentAsLastBets,
+    startSimulationUpdates,
+    stopSimulationUpdates,
+    updateBetLimits,
+    getBetZoneDisplayData,
+    getChipImages,
+    selectChip,
     toggleCommissionFree,
-    getTotalBetAmount,
     formatAmount,
-    addBetToHistory,
-    resetChipSettings,
-    init
+    init,
+    clearRound,
+
+    // 配置常量
+    BET_ZONE_CONFIGS,
+    CHIP_IMAGE_MAP
   }
 })

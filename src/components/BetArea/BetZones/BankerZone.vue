@@ -1,11 +1,11 @@
 <template>
   <div
-    class="bet-zone banker-zone"
+    class="bet-zone banker-zone second-row-zone"
     :class="{
       'active': hasActiveBet,
-      'disabled': isDisabled,
       'winning': isWinning,
-      'losing': isLosing
+      'losing': isLosing,
+      'can-bet': canPlaceBet
     }"
     @click="handleBetClick"
   >
@@ -14,22 +14,40 @@
       <div class="zone-odds">1:0.95</div>
     </div>
 
-    <div class="bet-info">
-      <div class="bet-amount" v-if="betAmount > 0">
-        ${{ formatAmount(betAmount) }}
+    <div class="bet-content">
+      <!-- 用户自己的投注金额 -->
+      <div class="user-bet-info">
+        <div class="user-bet-amount" v-if="displayData.userAmount > 0">
+          我的投注: ${{ formatAmount(displayData.userAmount) }}
+        </div>
       </div>
-      <div class="player-count" v-if="playerCount > 0">
-        <span class="count-icon">👥</span>
-        {{ playerCount }}
+
+      <!-- 其他用户信息 -->
+      <div class="other-users-info">
+        <div class="user-count">
+          <span class="count-icon">👥</span>
+          {{ displayData.otherPlayerCount }}人
+        </div>
+        <div class="total-amount">
+          总投注: ${{ formatAmount(displayData.otherTotalAmount) }}
+        </div>
       </div>
     </div>
 
-    <!-- 筹码显示 -->
-    <div class="chips-container" v-if="betAmount > 0">
+    <!-- 用户投注筹码显示 (使用图片) -->
+    <div class="chips-container" v-if="displayData.userAmount > 0">
       <div class="chip-stack">
-        <div class="chip" v-for="(chip, index) in displayChips" :key="index">
-          {{ chip }}
-        </div>
+        <img
+          v-for="(chip, index) in displayData.chipImages"
+          :key="index"
+          :src="chip.image"
+          :alt="`${chip.value}元筹码`"
+          class="chip-image"
+          :style="{
+            zIndex: index + 1,
+            transform: `translateY(-${index * 2}px) translateX(${index * 1}px)`
+          }"
+        />
       </div>
     </div>
 
@@ -37,14 +55,21 @@
     <div class="win-effect" v-if="showWinEffect">
       <div class="win-amount">+${{ formatAmount(winAmount) }}</div>
     </div>
+
+    <!-- 状态提示 -->
+    <div class="bet-status-indicator" v-if="statusMessage">
+      {{ statusMessage }}
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
+import { useGameStore } from '@/stores/gameStore'
 
 const bettingStore = useBettingStore()
+const gameStore = useGameStore()
 
 // 投注区域ID
 const ZONE_ID = 'banker'
@@ -54,44 +79,54 @@ const isWinning = ref(false)
 const isLosing = ref(false)
 const showWinEffect = ref(false)
 const winAmount = ref(0)
-const playerCount = ref(0)
+const statusMessage = ref('')
 
 // 计算属性
-const betAmount = computed(() => {
-  return bettingStore.currentBets[ZONE_ID] || 0
-})
-
 const hasActiveBet = computed(() => {
-  return betAmount.value > 0
+  return (bettingStore.currentBets[ZONE_ID] || 0) > 0
 })
 
-const isDisabled = computed(() => {
-  return bettingStore.gamePhase !== 'betting' || bettingStore.balance < bettingStore.selectedChip
+const canPlaceBet = computed(() => {
+  return gameStore.canBet || gameStore.gameState?.status === 'betting'
 })
 
-const displayChips = computed((): number[] => {
-  if (betAmount.value <= 0) return []
-
-  const chips: number[] = []
-  let remaining = betAmount.value
-  const chipValues: readonly number[] = [100, 50, 25, 10, 5, 1]
-
-  for (const value of chipValues) {
-    while (remaining >= value && chips.length < 5) {
-      chips.push(value)
-      remaining -= value
-    }
-  }
-
-  return chips
+// 获取显示数据（包含用户投注、其他用户数据、筹码图片）
+const displayData = computed(() => {
+  return bettingStore.getBetZoneDisplayData(ZONE_ID)
 })
 
 // 方法
 const handleBetClick = () => {
-  if (isDisabled.value) return
+  // 检查是否可以投注
+  if (!canPlaceBet.value) {
+    const gameStatus = gameStore.gameState?.status
+    let message = ''
 
-  const success = bettingStore.placeBet(ZONE_ID, bettingStore.selectedChip)
-  if (success) {
+    switch (gameStatus) {
+      case 'dealing':
+        message = '开牌中，暂停投注'
+        break
+      case 'result':
+        message = '结果公布中，暂停投注'
+        break
+      case 'waiting':
+        message = '等待新局开始'
+        break
+      default:
+        message = '当前不可投注'
+    }
+
+    showStatusMessage(message)
+    return
+  }
+
+  // 执行投注（使用 bettingStore 统一处理）
+  const result = bettingStore.placeBet(ZONE_ID, bettingStore.selectedChip)
+
+  if (result.success) {
+    console.log('庄投注成功:', result.amount)
+    showStatusMessage(result.message)
+
     // 触觉反馈
     if (navigator.vibrate) {
       navigator.vibrate(50)
@@ -99,6 +134,9 @@ const handleBetClick = () => {
 
     // 点击动画
     animateClick()
+  } else {
+    console.log('庄投注失败:', result.message)
+    showStatusMessage(result.message)
   }
 }
 
@@ -113,12 +151,14 @@ const animateClick = () => {
 }
 
 const formatAmount = (amount: number | undefined | null): string => {
-  // 参数验证和默认值处理
-  if (amount === undefined || amount === null || isNaN(amount)) {
-    return '0'  // 或者返回 '---' 或其他默认显示
-  }
+  return bettingStore.formatAmount(amount)
+}
 
-  return amount.toLocaleString()
+const showStatusMessage = (message: string) => {
+  statusMessage.value = message
+  setTimeout(() => {
+    statusMessage.value = ''
+  }, 3000)
 }
 
 const showWinAnimation = (amount: number) => {
@@ -134,76 +174,55 @@ const showWinAnimation = (amount: number) => {
 
 const showLoseAnimation = () => {
   isLosing.value = true
-
   setTimeout(() => {
     isLosing.value = false
   }, 2000)
 }
-
-// 监听游戏结果
-onMounted(() => {
-  // 模拟玩家数量变化
-  const updatePlayerCount = () => {
-    playerCount.value = Math.floor(Math.random() * 35) + 5
-  }
-
-  updatePlayerCount()
-  const interval = setInterval(updatePlayerCount, 30000)
-
-  onUnmounted(() => {
-    clearInterval(interval)
-  })
-})
 </script>
 
 <style scoped>
-.bet-zone {
+/* 第二排主要投注区域样式 */
+.second-row-zone {
   position: relative;
   background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
-  border: 2px solid #e74c3c;
+  border: 3px solid #e74c3c;
   border-radius: 12px;
   padding: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
-  min-height: 120px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  font-size: 14px;
 }
 
-.bet-zone:hover {
+.second-row-zone:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
   border-color: #ec7063;
 }
 
-.bet-zone.active {
+.second-row-zone.active {
   border-color: #f39c12;
-  background: linear-gradient(135deg, #8b4513 0%, #a0522d 100%);
-  box-shadow: 0 0 20px rgba(243, 156, 18, 0.5);
+  background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%);
+  box-shadow: 0 0 20px rgba(243, 156, 18, 0.7);
 }
 
-.bet-zone.disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  filter: grayscale(30%);
-}
-
-.bet-zone.winning {
+.second-row-zone.winning {
   background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
   border-color: #2ecc71;
   animation: winPulse 2s ease-in-out infinite;
 }
 
-.bet-zone.losing {
+.second-row-zone.losing {
   background: linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%);
   border-color: #95a5a6;
   animation: losePulse 1s ease-in-out 3;
 }
 
-.bet-zone.clicked {
+.second-row-zone.clicked {
   animation: clickPulse 0.2s ease-out;
 }
 
@@ -218,43 +237,63 @@ onMounted(() => {
   font-size: 20px;
   font-weight: bold;
   color: #ffffff;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
 }
 
 .zone-odds {
-  font-size: 14px;
+  font-size: 12px;
   color: #f1c40f;
   font-weight: 600;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.4);
   padding: 4px 8px;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid rgba(241, 196, 15, 0.3);
 }
 
-.bet-info {
+.bet-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.user-bet-info {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 20px;
+}
+
+.user-bet-amount {
+  font-size: 13px;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.other-users-info {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.bet-amount {
-  font-size: 16px;
-  font-weight: bold;
-  color: #f39c12;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-.player-count {
+.user-count {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
-  color: #bdc3c7;
 }
 
 .count-icon {
-  font-size: 10px;
+  font-size: 12px;
+}
+
+.total-amount {
+  font-weight: 600;
 }
 
 .chips-container {
@@ -266,25 +305,18 @@ onMounted(() => {
 
 .chip-stack {
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: row;
   align-items: center;
-  gap: 2px;
+  gap: -2px;
 }
 
-.chip {
+.chip-image {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: radial-gradient(circle, #f39c12 0%, #e67e22 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: bold;
-  color: white;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  border: 2px solid #ffffff;
+  transition: all 0.3s ease;
 }
 
 .win-effect {
@@ -297,10 +329,25 @@ onMounted(() => {
 }
 
 .win-amount {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: bold;
-  color: #2ecc71;
+  color: #f39c12;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.bet-status-indicator {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: #f39c12;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 100;
+  border: 1px solid rgba(243, 156, 18, 0.3);
 }
 
 /* 动画效果 */
@@ -347,9 +394,37 @@ onMounted(() => {
 
 /* 响应式适配 */
 @media (max-width: 768px) {
-  .bet-zone {
+  .second-row-zone {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .zone-title {
+    font-size: 18px;
+  }
+
+  .zone-odds {
+    font-size: 10px;
+  }
+
+  .user-bet-amount {
+    font-size: 11px;
+  }
+
+  .other-users-info {
+    font-size: 10px;
+  }
+
+  .chip-image {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .second-row-zone {
     padding: 8px;
-    min-height: 100px;
+    font-size: 11px;
   }
 
   .zone-title {
@@ -357,11 +432,20 @@ onMounted(() => {
   }
 
   .zone-odds {
-    font-size: 12px;
+    font-size: 9px;
   }
 
-  .bet-amount {
-    font-size: 14px;
+  .user-bet-amount {
+    font-size: 10px;
+  }
+
+  .other-users-info {
+    font-size: 9px;
+  }
+
+  .chip-image {
+    width: 18px;
+    height: 18px;
   }
 }
 </style>

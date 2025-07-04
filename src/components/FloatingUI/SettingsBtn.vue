@@ -28,8 +28,8 @@ const handleSettingsClick = () => {
 <style scoped>
 .settings-btn {
   position: absolute;
-  top: 55px;
-  right: 65px; /* 在余额按钮左边 */
+  top: 68px;
+  right: 8px;
   z-index: 15;
 }
 
@@ -66,8 +66,8 @@ const handleSettingsClick = () => {
 
 @media (max-width: 768px) {
   .settings-btn {
-    top: 48px;
-    right: 58px;
+    top: 68px;
+    right: 8px;
   }
 
   .settings-button {

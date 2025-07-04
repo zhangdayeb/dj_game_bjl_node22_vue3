@@ -1,30 +1,21 @@
 <template>
   <div class="betting-area-layout">
-    <!-- 投注区域标题 -->
-    <div class="betting-header">
-      <h2 class="betting-title">投注区域</h2>
-      <div class="betting-status">
-        <span class="status-indicator" :class="gamePhase">{{ getGamePhaseText() }}</span>
-        <span class="countdown" v-if="countdown > 0">{{ countdown }}s</span>
-      </div>
-    </div>
-
     <!-- 主要投注区域 -->
     <div class="main-betting-zones">
-      <!-- 第一排：庄对、庄、和、闲、闲对 -->
-      <div class="betting-row main-row">
-        <BankerPairZone class="zone-item" />
-        <BankerZone class="zone-item banker-main" />
-        <TieZone class="zone-item tie-main" />
-        <PlayerZone class="zone-item player-main" />
-        <PlayerPairZone class="zone-item" />
+      <!-- 第一排：龙7、庄对、幸运6、闲对、熊8 -->
+      <div class="betting-row first-row">
+        <Dragon7Zone class="zone-item side-bet" />
+        <BankerPairZone class="zone-item side-bet" />
+        <Lucky6Zone class="zone-item side-bet" />
+        <PlayerPairZone class="zone-item side-bet" />
+        <Panda8Zone class="zone-item side-bet" />
       </div>
 
-      <!-- 第二排：边注区域 -->
-      <div class="betting-row side-bets-row">
-        <Dragon7Zone class="zone-item side-bet" />
-        <Lucky6Zone class="zone-item side-bet" />
-        <Panda8Zone class="zone-item side-bet" />
+      <!-- 第二排：庄、和、闲 -->
+      <div class="betting-row second-row">
+        <BankerZone class="zone-item main-bet" />
+        <TieZone class="zone-item main-bet" />
+        <PlayerZone class="zone-item main-bet" />
       </div>
     </div>
 
@@ -63,8 +54,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
+import { useGameStore } from '@/stores/gameStore'
 import BankerPairZone from './BetZones/BankerPairZone.vue'
 import BankerZone from './BetZones/BankerZone.vue'
 import TieZone from './BetZones/TieZone.vue'
@@ -75,15 +67,11 @@ import Lucky6Zone from './BetZones/Lucky6Zone.vue'
 import Panda8Zone from './BetZones/Panda8Zone.vue'
 
 const bettingStore = useBettingStore()
+const gameStore = useGameStore()
 
-// 响应式数据
-const countdown = ref(30)
-const gamePhase = ref<'waiting' | 'betting' | 'dealing' | 'result'>('betting')
-
-// 计算属性
+// 计算属性 - 关联真实数据
 const totalBetAmount = computed(() => bettingStore.totalBetAmount)
-
-const balance = computed((): number => bettingStore.balance)
+const balance = computed((): number => gameStore.balance || 0)
 const selectedChip = computed((): number => bettingStore.selectedChip)
 const lastBets = computed((): Record<string, number> => bettingStore.lastBets)
 
@@ -91,25 +79,9 @@ const lastBets = computed((): Record<string, number> => bettingStore.lastBets)
 const formatAmount = (amount: number | undefined | null): string => {
   // 参数验证和默认值处理
   if (amount === undefined || amount === null || isNaN(amount)) {
-    return '0'  // 或者返回 '---' 或其他默认显示
+    return '0'
   }
-
   return amount.toLocaleString()
-}
-
-const getGamePhaseText = (): string => {
-  switch (gamePhase.value) {
-    case 'waiting':
-      return '等待开始'
-    case 'betting':
-      return '投注中'
-    case 'dealing':
-      return '开牌中'
-    case 'result':
-      return '结果公布'
-    default:
-      return '未知状态'
-  }
 }
 
 const getZoneName = (zone: string): string => {
@@ -119,54 +91,19 @@ const getZoneName = (zone: string): string => {
     'tie': '和',
     'player': '闲',
     'player-pair': '闲对',
-    'dragon7': '超级7',
+    'dragon7': '龙7',
     'lucky6': '幸运6',
-    'panda8': '庄对'
+    'panda8': '熊8'
   }
   return zoneNames[zone] || zone
 }
 
 const quickBet = (zone: string, amount: number): void => {
-  if (gamePhase.value === 'betting') {
+  // 检查游戏状态是否允许投注
+  if (gameStore.gameState?.status === 'betting' || gameStore.gameState?.status === 'waiting') {
     bettingStore.placeBet(zone, amount)
   }
 }
-
-// 游戏状态循环
-onMounted(() => {
-  const gameLoop = () => {
-    // 投注阶段
-    gamePhase.value = 'betting'
-    countdown.value = 30
-
-    const bettingInterval = setInterval(() => {
-      countdown.value--
-      if (countdown.value <= 0) {
-        clearInterval(bettingInterval)
-
-        // 开牌阶段
-        gamePhase.value = 'dealing'
-        countdown.value = 0
-
-        setTimeout(() => {
-          // 结果阶段
-          gamePhase.value = 'result'
-
-          setTimeout(() => {
-            // 等待阶段
-            gamePhase.value = 'waiting'
-
-            setTimeout(() => {
-              gameLoop() // 重新开始循环
-            }, 3000)
-          }, 5000)
-        }, 3000)
-      }
-    }, 1000)
-  }
-
-  gameLoop()
-})
 </script>
 
 <style scoped>
@@ -179,75 +116,10 @@ onMounted(() => {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-.betting-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.betting-title {
-  font-size: 24px;
-  font-weight: bold;
-  margin: 0;
-  color: #ffffff;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-.betting-status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.status-indicator {
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  text-align: center;
-  min-width: 80px;
-}
-
-.status-indicator.waiting {
-  background: linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%);
-  color: #ffffff;
-}
-
-.status-indicator.betting {
-  background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-  color: #ffffff;
-  animation: bettingPulse 2s ease-in-out infinite;
-}
-
-.status-indicator.dealing {
-  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
-  color: #ffffff;
-}
-
-.status-indicator.result {
-  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-  color: #ffffff;
-}
-
-.countdown {
-  font-size: 18px;
-  font-weight: bold;
-  color: #e74c3c;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-family: 'Courier New', monospace;
-  min-width: 40px;
-  text-align: center;
-}
-
 .main-betting-zones {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 20px;
 }
 
@@ -255,33 +127,62 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   align-items: stretch;
-}
-
-.main-row {
   justify-content: center;
 }
 
-.side-bets-row {
-  justify-content: center;
+/* 第一排：边注区域 */
+.first-row {
+  margin-bottom: 8px;
 }
 
-.zone-item {
+.first-row .zone-item {
   flex: 1;
-  min-width: 120px;
-  max-width: 180px;
+  min-width: 60px;
+  max-width: 80px;
+  height: 60px;
 }
 
-.banker-main, .player-main {
-  flex: 1.5;
-}
-
-.tie-main {
-  flex: 1.2;
+/* 第二排：主要投注区域 */
+.second-row .zone-item {
+  flex: 1;
+  min-width: 90px;
+  max-width: 120px;
+  height: 80px;
 }
 
 .side-bet {
-  flex: 1;
-  max-width: 140px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.main-bet {
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.zone-item:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .betting-stats {
@@ -362,52 +263,28 @@ onMounted(() => {
   font-family: 'Courier New', monospace;
 }
 
-/* 动画效果 */
-@keyframes bettingPulse {
-  0%, 100% {
-    box-shadow: 0 0 10px rgba(46, 204, 113, 0.5);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(46, 204, 113, 0.8);
-  }
-}
-
 /* 响应式适配 */
 @media (max-width: 768px) {
   .betting-area-layout {
     padding: 12px;
   }
 
-  .betting-header {
-    flex-direction: column;
+  .main-betting-zones {
     gap: 8px;
-    align-items: flex-start;
   }
 
-  .betting-title {
-    font-size: 20px;
+  .first-row .zone-item {
+    min-width: 50px;
+    max-width: 65px;
+    height: 50px;
+    font-size: 10px;
   }
 
-  .betting-row {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .main-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-  }
-
-  .side-bets-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-  }
-
-  .zone-item {
-    min-width: unset;
-    max-width: unset;
+  .second-row .zone-item {
+    min-width: 70px;
+    max-width: 90px;
+    height: 70px;
+    font-size: 14px;
   }
 
   .betting-stats {
@@ -419,19 +296,67 @@ onMounted(() => {
     flex-direction: row;
     justify-content: space-between;
   }
-}
-
-@media (max-width: 480px) {
-  .main-row {
-    grid-template-columns: 1fr;
-  }
-
-  .side-bets-row {
-    grid-template-columns: 1fr;
-  }
 
   .history-bets {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .betting-row {
+    gap: 6px;
+  }
+
+  .first-row .zone-item {
+    min-width: 45px;
+    max-width: 60px;
+    height: 45px;
+    font-size: 9px;
+  }
+
+  .second-row .zone-item {
+    min-width: 65px;
+    max-width: 80px;
+    height: 65px;
+    font-size: 13px;
+  }
+}
+
+/* 投注状态样式 */
+.zone-item.active {
+  background: rgba(46, 204, 113, 0.3);
+  border-color: #2ecc71;
+  box-shadow: 0 0 15px rgba(46, 204, 113, 0.5);
+}
+
+.zone-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.zone-item.winning {
+  animation: winningGlow 1s ease-in-out infinite alternate;
+}
+
+.zone-item.losing {
+  animation: losingFade 0.5s ease-out;
+}
+
+@keyframes winningGlow {
+  0% {
+    box-shadow: 0 0 10px rgba(46, 204, 113, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 25px rgba(46, 204, 113, 1);
+  }
+}
+
+@keyframes losingFade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.3;
   }
 }
 </style>

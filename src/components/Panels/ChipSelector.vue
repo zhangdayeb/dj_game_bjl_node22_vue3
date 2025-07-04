@@ -198,7 +198,7 @@ const toggleChipSelection = (chip: ChipData) => {
   }
 }
 
-// 🔥 修改：确认选择 - 确保恰好3个筹码
+// 🔥 关键修复：确认选择 - 确保恰好3个筹码并正确同步状态
 const confirmSelection = () => {
   if (selectedDisplayChips.value.length !== 3) {
     console.warn('⚠️ 请选择恰好3个筹码')
@@ -206,20 +206,15 @@ const confirmSelection = () => {
   }
 
   try {
-    // 🔥 调用 bettingStore 的 updateDisplayChips 方法
+    // 🔥 调用 bettingStore 的 updateDisplayChips 方法（已包含选中状态同步逻辑）
     if (bettingStore?.updateDisplayChips) {
       bettingStore.updateDisplayChips(selectedDisplayChips.value)
+      console.log('✅ 确认选择筹码:', selectedDisplayChips.value.map(c => c.value))
+      console.log('✅ 自动选择的当前筹码:', bettingStore.selectedChip)
     } else {
       console.error('❌ bettingStore.updateDisplayChips 方法不存在')
       return
     }
-
-    // 🔥 如果选择了筹码，将第一个设为当前选中筹码
-    if (bettingStore?.selectChip && selectedDisplayChips.value[0]) {
-      bettingStore.selectChip(selectedDisplayChips.value[0].value)
-    }
-
-    console.log('✅ 确认选择筹码:', selectedDisplayChips.value.map(c => c.value))
 
     // 🔥 关闭筹码选择器
     handleClose()

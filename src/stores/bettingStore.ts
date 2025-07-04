@@ -494,7 +494,7 @@ export const useBettingStore = defineStore('betting', () => {
     })
   }
 
-  // 🔥 新增：更新显示筹码方法
+  // 🔥 关键修复：更新显示筹码方法 - 确保选中状态同步
   const updateDisplayChips = (chips: ChipData[]): void => {
     // 确保恰好 3 个筹码
     const validChips = chips.slice(0, 3)
@@ -502,6 +502,9 @@ export const useBettingStore = defineStore('betting', () => {
     if (validChips.length === 0) {
       console.warn('⚠️ 未提供有效筹码，使用默认筹码')
       displayChips.value = [...DEFAULT_DISPLAY_CHIPS]
+      // 🔥 新增：自动选择第一个默认筹码
+      selectedChip.value = DEFAULT_DISPLAY_CHIPS[0].value
+      console.log(`🎯 自动选择默认筹码: ${selectedChip.value}`)
       return
     }
 
@@ -517,13 +520,23 @@ export const useBettingStore = defineStore('betting', () => {
       }
     }
 
+    // 🔥 关键修复：更新前保存当前选中筹码
+    const currentSelectedChip = selectedChip.value
+
+    // 更新显示筹码
     displayChips.value = validChips
     console.log('✅ 更新显示筹码:', displayChips.value.map(c => c.value))
 
-    // 如果当前选中的筹码不在新的显示列表中，自动选择第一个
-    if (!displayChips.value.some(chip => chip.value === selectedChip.value)) {
-      selectedChip.value = displayChips.value[0].value
-      console.log(`🎯 自动选择筹码: ${selectedChip.value}`)
+    // 🔥 关键修复：检查当前选中的筹码是否还在新的显示列表中
+    const isCurrentChipInNewList = validChips.some(chip => chip.value === currentSelectedChip)
+
+    if (!isCurrentChipInNewList) {
+      // 如果当前选中的筹码不在新列表中，自动选择第一个
+      selectedChip.value = validChips[0].value
+      console.log(`🎯 当前筹码 ${currentSelectedChip} 不在新列表中，自动选择第一个: ${selectedChip.value}`)
+    } else {
+      // 如果在新列表中，保持当前选择
+      console.log(`🎯 保持当前选中筹码: ${selectedChip.value}`)
     }
   }
 

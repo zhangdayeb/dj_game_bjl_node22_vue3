@@ -99,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
 import { useUIStore } from '@/stores/uiStore'
 
@@ -153,7 +153,7 @@ try {
   }
 }
 
-// 🔥 计算属性 - 完全依赖 bettingStore
+// 🔥 计算属性 - 完全依赖 bettingStore，增加响应式监听
 const displayChips = computed(() => {
   // 🔥 直接使用 bettingStore.getDisplayChipsData，它现在返回完整的 ChipData 对象
   const storeChips = bettingStore?.getDisplayChipsData || []
@@ -251,11 +251,21 @@ const formatAmount = (amount: number): string => {
   return amount.toLocaleString()
 }
 
-// 事件处理方法
+// 🔥 关键修复：筹码选择事件处理
 const handleChipSelect = (chip: ChipData) => {
   try {
-    bettingStore?.selectChip?.(chip.value)
-    console.log(`🎯 选择筹码: ${chip.value}`)
+    // 🔥 确保传递的是筹码的值而不是对象
+    const chipValue = chip.value
+    bettingStore?.selectChip?.(chipValue)
+    console.log(`🎯 选择筹码: ${chipValue}`)
+
+    // 🔥 添加调试信息
+    console.log('🔍 筹码选择调试信息:', {
+      选中的筹码对象: chip,
+      筹码值: chipValue,
+      当前选中筹码: bettingStore?.selectedChip,
+      显示筹码列表: displayChips.value.map(c => ({ id: c.id, value: c.value }))
+    })
 
     // 🔥 添加触觉反馈
     if (navigator.vibrate) {
@@ -329,6 +339,27 @@ const handleImageError = (event: Event) => {
   img.src = '/src/assets/images/chips/default.png'
   console.warn('⚠️ 筹码图片加载失败')
 }
+
+// 🔥 新增：监听 displayChips 变化，确保当前选中筹码在列表中
+watch(displayChips, (newChips) => {
+  if (newChips && newChips.length > 0) {
+    const currentSelectedChip = currentChip.value
+    const isCurrentChipInList = newChips.some(chip => chip.value === currentSelectedChip)
+
+    if (!isCurrentChipInList) {
+      console.log(`⚠️ 当前选中筹码 ${currentSelectedChip} 不在新的显示列表中`)
+      console.log('🔄 可选筹码:', newChips.map(c => c.value))
+      // 这里不主动修改，让 bettingStore.updateDisplayChips 处理
+    }
+  }
+}, { immediate: true, deep: true })
+
+// 🔥 新增：监听当前选中筹码变化
+watch(currentChip, (newChip, oldChip) => {
+  if (newChip !== oldChip) {
+    console.log(`🎯 当前选中筹码变化: ${oldChip} → ${newChip}`)
+  }
+}, { immediate: true })
 
 // 生命周期
 onMounted(() => {

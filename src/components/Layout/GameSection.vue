@@ -15,7 +15,6 @@
 
       <!-- 浮动UI层 -->
       <div class="floating-ui-layer">
-        <GameHeader />
         <UserBalance />
         <RoundNumber />
         <GameStatus />
@@ -80,7 +79,6 @@ import ResultEffect from '@/components/Effects/ResultEffect.vue'
 import WinningEffect from '@/components/Effects/WinningEffect.vue'
 
 // 浮动UI组件
-import GameHeader from '@/components/FloatingUI/GameHeader.vue'
 import UserBalance from '@/components/FloatingUI/UserBalance.vue'
 import RoundNumber from '@/components/FloatingUI/RoundNumber.vue'
 import GameStatus from '@/components/FloatingUI/GameStatus.vue'

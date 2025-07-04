@@ -8,30 +8,49 @@ import type { GameParams } from '@/utils/urlParams'
 import type { GameStatus } from '@/types/game'
 import type { TableInfo, UserInfo } from '@/services/gameApi'
 
-  /**
-   * 构建视频URL - 将tableId附加到tableVideo参数
-   * @param {string} baseVideoUrl - 基础视频URL
-   * @param {string|number} tableId - 桌台ID
-   * @returns {string} - 完整的视频URL
-   */
-  function buildVideoUrl(baseVideoUrl: string, tableId: string | number): string {
-    try {
-      const url = new URL(baseVideoUrl)
-      const tableVideo = url.searchParams.get('tableVideo')
+/**
+ * 构建视频URL - 将tableId附加到tableVideo参数
+ * @param {string} baseVideoUrl - 基础视频URL
+ * @param {string|number} tableId - 桌台ID
+ * @returns {string} - 完整的视频URL
+ */
+function buildVideoUrl(baseVideoUrl: string, tableId: string | number): string {
+  try {
+    const url = new URL(baseVideoUrl)
+    const tableVideo = url.searchParams.get('tableVideo')
 
-      if (tableVideo) {
-        // 将tableId附加到tableVideo参数后面
-        const newTableVideo = tableVideo + tableId
-        url.searchParams.set('tableVideo', newTableVideo)
-        return url.toString()
-      }
-
-      return baseVideoUrl
-    } catch (error) {
-      console.error('构建视频URL时出错:', error)
-      return baseVideoUrl
+    if (tableVideo) {
+      // 将tableId附加到tableVideo参数后面
+      const newTableVideo = tableVideo + tableId
+      url.searchParams.set('tableVideo', newTableVideo)
+      return url.toString()
     }
+
+    return baseVideoUrl
+  } catch (error) {
+    console.error('构建视频URL时出错:', error)
+    return baseVideoUrl
   }
+}
+
+// 🔥 新增：统计数据刷新回调管理
+interface StatisticsRefreshCallback {
+  (): Promise<void>
+}
+
+let statisticsRefreshCallback: StatisticsRefreshCallback | null = null
+
+// 🔥 新增：注册统计数据刷新回调
+export function registerStatisticsRefreshCallback(callback: StatisticsRefreshCallback): void {
+  statisticsRefreshCallback = callback
+  console.log('📊 统计数据刷新回调已注册')
+}
+
+// 🔥 新增：取消注册统计数据刷新回调
+export function unregisterStatisticsRefreshCallback(): void {
+  statisticsRefreshCallback = null
+  console.log('📊 统计数据刷新回调已取消注册')
+}
 
 // 网络状态接口
 interface NetworkStatus {
@@ -158,7 +177,7 @@ class NetworkMonitor {
     }
   }
 
-  // 更新游戏数据
+  // 🔥 修改：更新游戏数据（新增统计数据刷新）
   async updateGameData() {
     try {
       const apiService = getGlobalApiService()
@@ -190,6 +209,17 @@ class NetworkMonitor {
         // 更新游戏局号
         const gameNumber = this.generateGameNumber(tableInfo)
         gameData.gameNumber = gameNumber
+      }
+
+      // 🔥 新增：同时刷新统计数据
+      if (statisticsRefreshCallback) {
+        try {
+          await statisticsRefreshCallback()
+          console.log('📊 统计数据已同步更新')
+        } catch (error) {
+          console.error('❌ 统计数据更新失败:', error)
+          // 统计数据更新失败不影响主要数据流程
+        }
       }
 
       // 清除错误状态
@@ -441,6 +471,9 @@ async function loadInitialData(): Promise<void> {
 export function cleanupNetworkService(): void {
   console.log('🧹 清理网络服务...')
 
+  // 🔥 新增：清理统计回调
+  unregisterStatisticsRefreshCallback()
+
   // 清理定时器
   NetworkMonitor.getInstance().cleanup()
 
@@ -458,7 +491,7 @@ export function cleanupNetworkService(): void {
   console.log('✅ 网络服务已清理')
 }
 
-// 导出响应式数据供组件使用
+// 🔥 修改：导出响应式数据供组件使用（新增统计相关方法）
 export function useNetworkService() {
   return {
     // 状态
@@ -476,6 +509,23 @@ export function useNetworkService() {
 
     // 手动刷新数据
     refreshData: () => NetworkMonitor.getInstance().updateGameData(),
+
+    // 🔥 新增：统计数据管理
+    registerStatisticsCallback: registerStatisticsRefreshCallback,
+    unregisterStatisticsCallback: unregisterStatisticsRefreshCallback,
+
+    // 🔥 新增：手动刷新统计数据
+    refreshStatistics: async () => {
+      if (statisticsRefreshCallback) {
+        try {
+          await statisticsRefreshCallback()
+          console.log('📊 手动刷新统计数据成功')
+        } catch (error) {
+          console.error('❌ 手动刷新统计数据失败:', error)
+          throw error
+        }
+      }
+    },
 
     // WebSocket 方法
     sendWebSocketMessage: (data: any) => {
@@ -567,5 +617,8 @@ export default {
   initializeNetworkService,
   cleanupNetworkService,
   useNetworkService,
-  useGameDataWatcher
+  useGameDataWatcher,
+  // 🔥 新增：统计相关导出
+  registerStatisticsRefreshCallback,
+  unregisterStatisticsRefreshCallback
 }

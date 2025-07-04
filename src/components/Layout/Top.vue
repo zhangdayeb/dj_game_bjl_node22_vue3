@@ -1,4 +1,4 @@
-<!-- src/components/Layout/Top.vue - 修复版 -->
+<!-- src/components/Layout/Top.vue - 集成统计组件版 -->
 <template>
   <div class="top-section" :style="topSectionStyles">
     <!-- 视频播放器 -->
@@ -39,12 +39,15 @@
         @vipCenter="handleVipCenter"
         @customerService="handleCustomerService"
       />
+
+      <!-- 🔥 新增：游戏统计组件 - 位于左下角 -->
+      <GameCount ref="gameCountRef" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, type CSSProperties } from 'vue'
+import { ref, computed, onMounted, onUnmounted, type CSSProperties } from 'vue'
 import { useNetworkService } from '@/services/networkService'
 
 // 组件导入
@@ -54,6 +57,7 @@ import RoundNumber from '@/components/FloatingUI/RoundNumber.vue'
 import GameStatus from '@/components/FloatingUI/GameStatus.vue'
 import Countdown from '@/components/FloatingUI/Countdown.vue'
 import SettingsBtn from '@/components/FloatingUI/SettingsBtn.vue'
+import GameCount from '@/components/FloatingUI/GameCount.vue' // 🔥 新增统计组件
 
 // Props - 只需要高度
 interface Props {
@@ -65,10 +69,19 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 // 🔥 使用网络服务获取真实数据
-const { gameData, networkStatus, refreshData, toggleMusic, toggleSfx } = useNetworkService()
+const {
+  gameData,
+  networkStatus,
+  refreshData,
+  toggleMusic,
+  toggleSfx,
+  registerStatisticsCallback,
+  unregisterStatisticsCallback
+} = useNetworkService()
 
 // 组件引用
 const videoPlayerRef = ref<InstanceType<typeof VideoPlayer>>()
+const gameCountRef = ref<InstanceType<typeof GameCount>>() // 🔥 新增统计组件引用
 
 // 🔥 内部音频设置状态
 const audioSettings = ref({
@@ -93,11 +106,11 @@ const currentVideoUrl = computed(() => {
 })
 
 const currentBalance = computed(() => {
-  return gameData.balance || 10000
+  return gameData.balance || 1000
 })
 
 const currentGameNumber = computed(() => {
-  return gameData.gameNumber || 'B00125010001'
+  return gameData.gameNumber || 'T00124060610001'
 })
 
 const currentGameStatus = computed(() => {
@@ -108,63 +121,40 @@ const currentCountdown = computed(() => {
   return gameData.countdown || 0
 })
 
-// 🔥 自动数据同步 - 监听 networkService 数据变化
-onMounted(() => {
-  console.log('🎮 Top 组件已挂载')
-  console.log('📊 当前游戏数据:', gameData)
-  console.log('💰 当前余额:', gameData.balance)
-  console.log('🎯 当前局号:', gameData.gameNumber)
-  console.log('🎬 当前视频URL:', gameData.videoUrl)
-  console.log('🔗 网络状态:', networkStatus)
-})
-
-// 🔥 视频相关事件处理
+// 视频事件处理
 const handleVideoLoad = () => {
-  console.log('✅ 视频加载完成')
-  console.log('🎬 加载的视频URL:', currentVideoUrl.value)
+  console.log('🎥 视频加载完成')
 }
 
-const handleVideoError = () => {
-  console.error('❌ 视频加载失败')
-  console.error('🎬 失败的视频URL:', currentVideoUrl.value)
+const handleVideoError = (error: Event) => {
+  console.error('❌ 视频加载失败:', error)
 }
 
-const handleBalanceRefresh = () => {
-  console.log('🔄 刷新余额')
-  // 🔥 调用网络服务的刷新方法
+// 余额刷新
+const handleBalanceRefresh = async () => {
   try {
-    refreshData()
-    console.log('余额刷新请求已发送')
+    console.log('🔄 刷新数据中...')
+    await refreshData()
+    console.log('✅ 数据刷新完成')
   } catch (error) {
-    console.error('余额刷新失败:', error)
+    console.error('❌ 刷新失败:', error)
   }
 }
 
-// 🔥 倒计时处理 - 自动控制视频缩放
-const handleCountdownChange = (seconds: number) => {
-  console.log(`⏰ 倒计时变化: ${seconds}秒`)
+// 倒计时变化处理
+const handleCountdownChange = (newCountdown: number) => {
+  console.log(`⏰ 倒计时变化: ${newCountdown}`)
+}
 
-  if (!videoPlayerRef.value) return
+// 视频缩放处理（如有需要）
+const handleVideoZoom = (zoomLevel: number) => {
+  console.log(`🔍 视频缩放: ${zoomLevel}`)
 
-  const phase = currentGameStatus.value
-
-  switch (phase) {
-    case 'betting':
-      // 投注阶段 - 保持正常大小
-      videoPlayerRef.value.resetZoom?.()
-      break
-
+  // 根据游戏状态自动缩放
+  switch (currentGameStatus.value) {
     case 'dealing':
-      // 开牌阶段 - 根据倒计时放大
-      if (seconds <= 10) {
-        const zoomLevel = 1 + (10 - seconds) * 0.05
-        videoPlayerRef.value.setZoom?.(zoomLevel, true)
-      }
-      break
-
-    case 'result':
-      // 结果阶段 - 最大放大
-      videoPlayerRef.value.animateZoom?.(1.5, 1000)
+      // 开牌时放大
+      videoPlayerRef.value?.setZoom?.(1.5, 1000)
 
       // 5秒后缩小回正常
       setTimeout(() => {
@@ -227,9 +217,49 @@ const handleCustomerService = () => {
   }
 }
 
+// 🔥 新增：统计数据刷新方法（由 networkService 的 3 秒定时器调用）
+const refreshStatistics = async () => {
+  if (gameCountRef.value?.refreshStatistics) {
+    await gameCountRef.value.refreshStatistics()
+  }
+}
+
+// 🔥 新增：获取当前统计数据
+const getCurrentStatistics = () => {
+  return gameCountRef.value?.statistics || null
+}
+
+// 组件挂载时的初始化
+onMounted(() => {
+  console.log('✅ Top 组件已挂载，包含统计功能')
+
+  // 🔥 注册统计数据刷新回调到 networkService
+  if (registerStatisticsCallback && gameCountRef.value?.refreshStatistics) {
+    registerStatisticsCallback(async () => {
+      if (gameCountRef.value?.refreshStatistics) {
+        await gameCountRef.value.refreshStatistics()
+      }
+    })
+    console.log('📊 统计数据刷新回调已注册到 networkService')
+  }
+})
+
+// 🔥 新增：组件卸载时清理
+onUnmounted(() => {
+  console.log('🔧 Top 组件卸载，清理统计数据回调')
+
+  // 取消注册统计数据刷新回调
+  if (unregisterStatisticsCallback) {
+    unregisterStatisticsCallback()
+  }
+})
+
 // 暴露方法给父组件（如果需要外部控制）
 defineExpose({
   videoPlayerRef,
+  gameCountRef, // 🔥 暴露统计组件引用
+  refreshStatistics, // 🔥 暴露统计刷新方法
+  getCurrentStatistics, // 🔥 暴露获取统计数据方法
   // 暴露当前数据状态供调试
   currentVideoUrl,
   currentBalance,
@@ -266,5 +296,10 @@ defineExpose({
   .top-section {
     border-radius: 0 0 6px 6px;
   }
+}
+
+/* 🔥 确保统计组件在左下角正确显示 */
+.floating-ui-layer :deep(.game-count-container) {
+  z-index: 20; /* 确保统计组件在其他组件之上 */
 }
 </style>

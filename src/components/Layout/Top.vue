@@ -1,4 +1,4 @@
-<!-- src/components/Layout/Top.vue - 集成统计组件版 -->
+<!-- src/components/Layout/Top.vue - 修复 TypeScript 错误版本 -->
 <template>
   <div class="top-section" :style="topSectionStyles">
     <!-- 视频播放器 -->
@@ -121,13 +121,14 @@ const currentCountdown = computed(() => {
   return gameData.countdown || 0
 })
 
-// 视频事件处理
+// 🔥 修复：视频事件处理器 - 移除不需要的参数
 const handleVideoLoad = () => {
   console.log('🎥 视频加载完成')
 }
 
-const handleVideoError = (error: Event) => {
-  console.error('❌ 视频加载失败:', error)
+// 🔥 修复：VideoPlayer 的 videoError 事件不传递参数
+const handleVideoError = () => {
+  console.error('❌ 视频加载失败')
 }
 
 // 余额刷新
@@ -146,15 +147,15 @@ const handleCountdownChange = (newCountdown: number) => {
   console.log(`⏰ 倒计时变化: ${newCountdown}`)
 }
 
-// 视频缩放处理（如有需要）
+// 🔥 修复：视频缩放处理 - 使用正确的 animateZoom 方法
 const handleVideoZoom = (zoomLevel: number) => {
   console.log(`🔍 视频缩放: ${zoomLevel}`)
 
   // 根据游戏状态自动缩放
   switch (currentGameStatus.value) {
     case 'dealing':
-      // 开牌时放大
-      videoPlayerRef.value?.setZoom?.(1.5, 1000)
+      // 开牌时放大 - 使用 animateZoom 方法，传入目标缩放和动画时长
+      videoPlayerRef.value?.animateZoom?.(1.5, 1000)
 
       // 5秒后缩小回正常
       setTimeout(() => {

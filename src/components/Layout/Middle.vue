@@ -53,7 +53,7 @@ const middleSectionStyles = computed((): CSSProperties => ({
 .betting-area-wrapper {
   flex: 1;
   overflow: hidden;
-  margin-bottom: 10px;
+  margin-right: 10px;
 }
 
 /* 响应式设计 */
@@ -63,7 +63,7 @@ const middleSectionStyles = computed((): CSSProperties => ({
   }
 
   .betting-area-wrapper {
-    margin-bottom: 8px;
+    margin-right: 8px;
   }
 }
 </style>

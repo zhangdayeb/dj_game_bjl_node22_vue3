@@ -44,20 +44,29 @@
       </div>
     </div>
 
-    <!-- 筹码显示 -->
+    <!-- 🔥 修改：垂直堆叠的筹码显示 -->
     <div class="chips-container" v-if="shouldShowChips">
       <div class="chip-stack">
         <img
-          v-for="(chip, index) in chipImages"
-          :key="index"
+          v-for="(chip, index) in chipImages.slice(0, 6)"
+          :key="`chip-${index}`"
           :src="chip.image"
           :alt="`${chip.value}筹码`"
           class="chip-image"
           :style="{
-            zIndex: index + 1,
-            transform: `translateY(-${index * 2}px) translateX(${index * 1}px)`
+            '--chip-index': chipImages.length - index,
+            animationDelay: `${index * 50}ms`
           }"
         />
+
+        <!-- 🔥 筹码数量徽章 -->
+        <div
+          v-if="chipImages.length > 6"
+          class="chip-count-badge"
+          :title="`总共${chipImages.length}个筹码`"
+        >
+          {{ chipImages.length }}
+        </div>
       </div>
     </div>
 
@@ -406,28 +415,99 @@ defineExpose({
   font-weight: 600;
 }
 
-/* 🎲 筹码样式 */
+/* 🔥 修改：垂直堆叠的筹码样式 */
 .chips-container {
   position: absolute;
-  bottom: 4px;
-  right: 4px;
+  bottom: 6px;
+  right: 6px;
   pointer-events: none;
+  max-width: 80px;
+  max-height: calc(100% - 40px); /* 留出区域标题和投注信息的空间 */
+  overflow: hidden;
 }
 
 .chip-stack {
   display: flex;
-  flex-direction: row;
+  flex-direction: column; /* 🔥 改为垂直排列 */
   align-items: center;
-  gap: -2px;
+  justify-content: flex-end; /* 🔥 从底部开始堆叠 */
+  gap: 0; /* 移除间距，让筹码紧密堆叠 */
+  position: relative;
+  height: 100%;
 }
 
 .chip-image {
-  width: 60px;
-  height: 60px;
+  width: 45px;  /* 🔥 缩小筹码尺寸 */
+  height: 45px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
   transition: all 0.3s ease;
+  position: relative;
+
+  /* 🔥 垂直堆叠的关键样式 */
+  margin-top: -12px; /* 让筹码重叠，模拟真实堆叠效果 */
+  z-index: var(--chip-index, 1);
+}
+
+/* 🔥 第一个筹码不需要上边距 */
+.chip-image:first-child {
+  margin-top: 0;
+  z-index: 1;
+}
+
+/* 🔥 为每个筹码设置递增的 z-index，确保正确的层叠顺序 */
+.chip-image:nth-child(1) { z-index: 6; }
+.chip-image:nth-child(2) { z-index: 5; }
+.chip-image:nth-child(3) { z-index: 4; }
+.chip-image:nth-child(4) { z-index: 3; }
+.chip-image:nth-child(5) { z-index: 2; }
+.chip-image:nth-child(6) { z-index: 1; }
+
+/* 🔥 hover 效果 - 整个筹码堆的交互 */
+.chips-container:hover .chip-image {
+  transform: translateY(-2px);
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.3),
+    0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+/* 🔥 筹码计数徽章 */
+.chip-count-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: rgba(255, 193, 7, 0.9);
+  color: #000;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  z-index: 10;
+}
+
+/* 🔥 筹码堆叠动画效果 */
+@keyframes chipStack {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.chip-image {
+  animation: chipStack 0.3s ease-out;
+  animation-fill-mode: both;
 }
 
 /* 🏆 效果样式 */
@@ -514,7 +594,7 @@ defineExpose({
   }
 }
 
-/* 📱 响应式适配 */
+/* 🔥 响应式调整 - 移动端进一步缩小 */
 @media (max-width: 768px) {
   .first-row-zone {
     padding: 4px;
@@ -538,9 +618,28 @@ defineExpose({
     font-size: 16px;
   }
 
+  .chips-container {
+    bottom: 4px;
+    right: 4px;
+    max-width: 60px;
+  }
+
   .chip-image {
-    width: 40px;
-    height: 40px;
+    width: 35px;
+    height: 35px;
+    margin-top: -10px;
+  }
+
+  .chip-image:first-child {
+    margin-top: 0;
+  }
+
+  .chip-count-badge {
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+    top: -6px;
+    right: -6px;
   }
 }
 
@@ -559,9 +658,43 @@ defineExpose({
     font-size: 14px;
   }
 
-  .chip-image {
-    width: 40px;
-    height: 40px;
+  .chips-container {
+    bottom: 3px;
+    right: 3px;
+    max-width: 50px;
   }
+
+  .chip-image {
+    width: 30px;
+    height: 30px;
+    margin-top: -8px;
+  }
+
+  .chip-count-badge {
+    width: 14px;
+    height: 14px;
+    font-size: 7px;
+    top: -5px;
+    right: -5px;
+  }
+}
+
+/* 🔥 为不同主题的投注区域调整筹码位置 */
+.main-zone .chips-container {
+  bottom: 8px;
+  right: 8px;
+}
+
+.side-zone .chips-container {
+  bottom: 4px;
+  right: 4px;
+  max-width: 60px;
+}
+
+/* 🔥 特别优化：较小的边注区域 */
+.side-zone .chip-image {
+  width: 32px;
+  height: 32px;
+  margin-top: -8px;
 }
 </style>

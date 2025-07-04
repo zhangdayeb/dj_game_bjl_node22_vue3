@@ -1,10 +1,10 @@
-<!-- src/components/Layout/Top.vue -->
+<!-- src/components/Layout/Top.vue - 修复版 -->
 <template>
   <div class="top-section" :style="topSectionStyles">
     <!-- 视频播放器 -->
     <VideoPlayer
       ref="videoPlayerRef"
-      :videoUrl="gameStore.videoUrl || videoUrl"
+      :videoUrl="currentVideoUrl"
       :showControls="false"
       :showZoomIndicator="false"
       :autoZoom="true"
@@ -15,18 +15,18 @@
     <!-- 浮动UI状态层 -->
     <div class="floating-ui-layer">
       <UserBalance
-        :balance="gameStore.balance || 10000"
+        :balance="currentBalance"
         :currency="'CNY'"
         @refresh="handleBalanceRefresh"
       />
       <RoundNumber
-        :roundNumber="gameStore.fullGameNumber || 'B00125010001'"
+        :roundNumber="currentGameNumber"
       />
       <GameStatus
-        :gameStatus="gameStore.gameState?.status || 'waiting'"
+        :gameStatus="currentGameStatus"
       />
       <Countdown
-        :countdown="gameStore.gameState?.countdown || 0"
+        :countdown="currentCountdown"
         :maxTime="30"
         @countdownChange="handleCountdownChange"
       />
@@ -45,7 +45,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, type CSSProperties } from 'vue'
-import { useGameStore } from '@/stores/gameStore'
+// 🔥 修改：使用 networkService 而不是 gameStore
+import { useNetworkService } from '@/services/networkService'
 
 // 组件导入
 import VideoPlayer from '@/components/VideoPlayer/VideoPlayer.vue'
@@ -64,8 +65,8 @@ const props = withDefaults(defineProps<Props>(), {
   height: 350
 })
 
-// Store
-const gameStore = useGameStore()
+// 🔥 使用网络服务获取真实数据
+const { gameData, networkStatus, refreshData, toggleMusic, toggleSfx } = useNetworkService()
 
 // 组件引用
 const videoPlayerRef = ref<InstanceType<typeof VideoPlayer>>()
@@ -75,9 +76,6 @@ const audioSettings = ref({
   bgmEnabled: true,
   sfxEnabled: true
 })
-
-// 默认视频URL
-const videoUrl = ref('https://example.com/live-stream.m3u8')
 
 // 计算样式
 const topSectionStyles = computed((): CSSProperties => ({
@@ -90,28 +88,53 @@ const topSectionStyles = computed((): CSSProperties => ({
   flexShrink: 0
 }))
 
-// 🔥 自动数据同步 - 监听 Store 变化
+// 🔥 计算属性 - 从 networkService 获取真实数据
+const currentVideoUrl = computed(() => {
+  return gameData.videoUrl || 'https://example.com/live-stream.m3u8'
+})
+
+const currentBalance = computed(() => {
+  return gameData.balance || 10000
+})
+
+const currentGameNumber = computed(() => {
+  return gameData.gameNumber || 'B00125010001'
+})
+
+const currentGameStatus = computed(() => {
+  return gameData.gameStatus || 'waiting'
+})
+
+const currentCountdown = computed(() => {
+  return gameData.countdown || 0
+})
+
+// 🔥 自动数据同步 - 监听 networkService 数据变化
 onMounted(() => {
   console.log('🎮 Top 组件已挂载')
-  console.log('📊 当前游戏状态:', gameStore.gameState)
-  console.log('💰 当前余额:', gameStore.balance)
-  console.log('🎯 当前局号:', gameStore.fullGameNumber)
+  console.log('📊 当前游戏数据:', gameData)
+  console.log('💰 当前余额:', gameData.balance)
+  console.log('🎯 当前局号:', gameData.gameNumber)
+  console.log('🎬 当前视频URL:', gameData.videoUrl)
+  console.log('🔗 网络状态:', networkStatus)
 })
 
 // 🔥 视频相关事件处理
 const handleVideoLoad = () => {
   console.log('✅ 视频加载完成')
+  console.log('🎬 加载的视频URL:', currentVideoUrl.value)
 }
 
 const handleVideoError = () => {
   console.error('❌ 视频加载失败')
+  console.error('🎬 失败的视频URL:', currentVideoUrl.value)
 }
 
 const handleBalanceRefresh = () => {
   console.log('🔄 刷新余额')
-  // 可以调用 gameStore 的刷新余额方法
+  // 🔥 调用网络服务的刷新方法
   try {
-    // gameStore.refreshBalance?.()
+    refreshData()
     console.log('余额刷新请求已发送')
   } catch (error) {
     console.error('余额刷新失败:', error)
@@ -124,7 +147,7 @@ const handleCountdownChange = (seconds: number) => {
 
   if (!videoPlayerRef.value) return
 
-  const phase = gameStore.gameState?.status || 'waiting'
+  const phase = currentGameStatus.value
 
   switch (phase) {
     case 'betting':
@@ -156,13 +179,23 @@ const handleCountdownChange = (seconds: number) => {
 const handleBgmToggle = (enabled: boolean) => {
   audioSettings.value.bgmEnabled = enabled
   console.log(`🎵 背景音乐: ${enabled ? '开启' : '关闭'}`)
-  // 这里可以调用音频控制API
+  // 🔥 调用网络服务的音频控制
+  try {
+    toggleMusic()
+  } catch (error) {
+    console.error('音频控制失败:', error)
+  }
 }
 
 const handleSfxToggle = (enabled: boolean) => {
   audioSettings.value.sfxEnabled = enabled
   console.log(`🔊 音效: ${enabled ? '开启' : '关闭'}`)
-  // 这里可以调用音效控制API
+  // 🔥 调用网络服务的音效控制
+  try {
+    toggleSfx()
+  } catch (error) {
+    console.error('音效控制失败:', error)
+  }
 }
 
 // 🔥 SettingsBtn 事件处理 - 现在 SettingsBtn 内部处理所有面板
@@ -197,7 +230,13 @@ const handleCustomerService = () => {
 
 // 暴露方法给父组件（如果需要外部控制）
 defineExpose({
-  videoPlayerRef
+  videoPlayerRef,
+  // 暴露当前数据状态供调试
+  currentVideoUrl,
+  currentBalance,
+  currentGameNumber,
+  currentGameStatus,
+  currentCountdown
 })
 </script>
 

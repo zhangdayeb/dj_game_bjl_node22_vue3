@@ -1,4 +1,4 @@
-// src/stores/bettingStore.ts - 完整修复版
+// src/stores/bettingStore.ts - 修复版：统一筹码管理
 import { defineStore } from 'pinia'
 import { ref, computed, reactive } from 'vue'
 
@@ -199,6 +199,13 @@ export const AVAILABLE_CHIPS: ChipData[] = [
   { id: 'chip-1000000000', value: 1000000000, name: '1000M', image: CHIP_IMAGE_MAP[1000000000], displayValue: '1000M' }
 ]
 
+// 🔥 统一默认筹码：3个筹码 [10, 50, 100]
+export const DEFAULT_DISPLAY_CHIPS: ChipData[] = [
+  { id: 'chip-10', value: 10, name: '10', image: CHIP_IMAGE_MAP[10], displayValue: '10' },
+  { id: 'chip-50', value: 50, name: '50', image: CHIP_IMAGE_MAP[50], displayValue: '50' },
+  { id: 'chip-100', value: 100, name: '100', image: CHIP_IMAGE_MAP[100], displayValue: '100' }
+]
+
 // 投注区域模拟数据
 interface BetZoneData {
   totalAmount: number
@@ -230,7 +237,7 @@ interface BetLimits {
 }
 
 // 默认筹码（保持兼容性）
-export const DEFAULT_CHIPS = [1, 5, 10, 50, 100] as const
+export const DEFAULT_CHIPS = [10, 50, 100] as const
 
 export const useBettingStore = defineStore('betting', () => {
   // 基础状态
@@ -290,8 +297,8 @@ export const useBettingStore = defineStore('betting', () => {
     'panda-8': { min: 10, max: 2000 }
   })
 
-  // 筹码相关状态
-  const displayChips = ref<string[]>(['chip-10', 'chip-50', 'chip-100'])
+  // 🔥 修改：筹码相关状态 - 直接存储完整的筹码对象
+  const displayChips = ref<ChipData[]>([...DEFAULT_DISPLAY_CHIPS])
   const availableChips = ref(AVAILABLE_CHIPS)
 
   // 模拟数据更新定时器
@@ -322,10 +329,9 @@ export const useBettingStore = defineStore('betting', () => {
     return Object.values(lastBets).some(amount => amount > 0)
   })
 
+  // 🔥 修改：计算属性 - 直接返回 displayChips
   const getDisplayChipsData = computed(() => {
-    return availableChips.value.filter(chip =>
-      displayChips.value.includes(chip.id)
-    )
+    return displayChips.value
   })
 
   // 获取筹码图片数组（用于显示）
@@ -488,6 +494,69 @@ export const useBettingStore = defineStore('betting', () => {
     })
   }
 
+  // 🔥 新增：更新显示筹码方法
+  const updateDisplayChips = (chips: ChipData[]): void => {
+    // 确保恰好 3 个筹码
+    const validChips = chips.slice(0, 3)
+
+    if (validChips.length === 0) {
+      console.warn('⚠️ 未提供有效筹码，使用默认筹码')
+      displayChips.value = [...DEFAULT_DISPLAY_CHIPS]
+      return
+    }
+
+    // 如果不足 3 个，用默认筹码补齐
+    while (validChips.length < 3) {
+      const defaultChip = DEFAULT_DISPLAY_CHIPS.find(chip =>
+        !validChips.some(existing => existing.value === chip.value)
+      )
+      if (defaultChip) {
+        validChips.push(defaultChip)
+      } else {
+        break
+      }
+    }
+
+    displayChips.value = validChips
+    console.log('✅ 更新显示筹码:', displayChips.value.map(c => c.value))
+
+    // 如果当前选中的筹码不在新的显示列表中，自动选择第一个
+    if (!displayChips.value.some(chip => chip.value === selectedChip.value)) {
+      selectedChip.value = displayChips.value[0].value
+      console.log(`🎯 自动选择筹码: ${selectedChip.value}`)
+    }
+  }
+
+  // 🔥 修改：根据余额智能推荐显示筹码
+  const updateDisplayChipsByBalance = (currentBalance: number): void => {
+    let recommendedValues: number[] = []
+
+    // 根据余额智能推荐3个筹码
+    if (currentBalance >= 50000) {
+      recommendedValues = [100, 1000, 10000]
+    } else if (currentBalance >= 10000) {
+      recommendedValues = [50, 500, 5000]
+    } else if (currentBalance >= 1000) {
+      recommendedValues = [10, 50, 100]
+    } else if (currentBalance >= 100) {
+      recommendedValues = [1, 5, 10]
+    } else {
+      recommendedValues = [1, 5, 10]
+    }
+
+    // 过滤出可用的筹码并转换为 ChipData 对象
+    const recommendedChips = recommendedValues
+      .map(value => availableChips.value.find(chip => chip.value === value))
+      .filter(chip => chip !== undefined) as ChipData[]
+
+    if (recommendedChips.length >= 3) {
+      updateDisplayChips(recommendedChips.slice(0, 3))
+    } else {
+      // 如果推荐筹码不足，使用默认筹码
+      updateDisplayChips(DEFAULT_DISPLAY_CHIPS)
+    }
+  }
+
   // 🔥 新增：闪烁效果管理方法
   const startBlinking = (zoneId: BaccaratBetType): void => {
     blinkingZones.value.add(zoneId)
@@ -594,6 +663,9 @@ export const useBettingStore = defineStore('betting', () => {
     gamePhase.value = 'betting'
     isCommissionFree.value = false
 
+    // 🔥 重置显示筹码为默认值
+    displayChips.value = [...DEFAULT_DISPLAY_CHIPS]
+
     // 清空投注
     clearAllBets()
 
@@ -639,7 +711,7 @@ export const useBettingStore = defineStore('betting', () => {
     lastBets,
     simulationData,
     betLimits,
-    displayChips,
+    displayChips, // 🔥 修改：直接暴露 displayChips
     availableChips,
     blinkingZones,
 
@@ -666,6 +738,10 @@ export const useBettingStore = defineStore('betting', () => {
     init,
     clearRound,
 
+    // 🔥 新增：筹码管理方法
+    updateDisplayChips,
+    updateDisplayChipsByBalance,
+
     // 🔥 新增：闪烁效果方法
     startBlinking,
     stopBlinking,
@@ -674,6 +750,7 @@ export const useBettingStore = defineStore('betting', () => {
 
     // 配置常量
     BET_ZONE_CONFIGS,
-    CHIP_IMAGE_MAP
+    CHIP_IMAGE_MAP,
+    DEFAULT_DISPLAY_CHIPS
   }
 })

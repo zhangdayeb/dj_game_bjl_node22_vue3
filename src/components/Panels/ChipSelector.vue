@@ -28,7 +28,7 @@
         <!-- 🔥 当前选中的3个筹码显示 -->
         <div class="current-selection">
           <div class="selection-info">
-            <span class="selection-label">当前选中筹码:</span>
+            <span class="selection-label">当前选中筹码 (3/3):</span>
             <div class="selected-chips-display">
               <div
                 v-for="chip in selectedDisplayChips"
@@ -52,7 +52,7 @@
 
         <!-- 筹码选择 -->
         <div class="chips-section">
-          <h3 class="section-title">选择筹码</h3>
+          <h3 class="section-title">选择筹码 ({{ selectedDisplayChips.length }}/3)</h3>
           <div class="chips-grid">
             <div
               v-for="chip in availableChips"
@@ -98,7 +98,7 @@
           </button>
           <button
             class="btn btn-primary"
-            :disabled="selectedDisplayChips.length === 0"
+            :disabled="selectedDisplayChips.length !== 3"
             @click="confirmSelection"
           >
             确认选择 ({{ selectedDisplayChips.length }}/3)
@@ -127,7 +127,7 @@ interface ChipData {
 const bettingStore = useBettingStore()
 const uiStore = useUIStore()
 
-// 🔥 响应式数据 - 改为多选
+// 🔥 响应式数据 - 确保恰好3个筹码
 const selectedDisplayChips = ref<ChipData[]>([])
 
 // 计算属性
@@ -137,44 +137,7 @@ const currentBalance = computed(() => {
 
 // 从 bettingStore 获取完整的筹码数据
 const availableChips = computed((): ChipData[] => {
-  return bettingStore?.availableChips || [
-    { id: 'chip-1', value: 1, name: '1', image: '/src/assets/images/chips/B_01.png', displayValue: '1' },
-    { id: 'chip-5', value: 5, name: '5', image: '/src/assets/images/chips/B_05.png', displayValue: '5' },
-    { id: 'chip-10', value: 10, name: '10', image: '/src/assets/images/chips/B_10.png', displayValue: '10' },
-    { id: 'chip-20', value: 20, name: '20', image: '/src/assets/images/chips/B_20.png', displayValue: '20' },
-    { id: 'chip-50', value: 50, name: '50', image: '/src/assets/images/chips/B_50.png', displayValue: '50' },
-    { id: 'chip-100', value: 100, name: '100', image: '/src/assets/images/chips/B_100.png', displayValue: '100' },
-    { id: 'chip-500', value: 500, name: '500', image: '/src/assets/images/chips/B_500.png', displayValue: '500' },
-    { id: 'chip-1000', value: 1000, name: '1K', image: '/src/assets/images/chips/B_1K.png', displayValue: '1K' },
-    { id: 'chip-5000', value: 5000, name: '5K', image: '/src/assets/images/chips/B_5K.png', displayValue: '5K' },
-    { id: 'chip-10000', value: 10000, name: '10K', image: '/src/assets/images/chips/B_10K.png', displayValue: '10K' },
-    { id: 'chip-20000', value: 20000, name: '20K', image: '/src/assets/images/chips/B_20K.png', displayValue: '20K' },
-    { id: 'chip-50000', value: 50000, name: '50K', image: '/src/assets/images/chips/B_50K.png', displayValue: '50K' }
-  ]
-})
-
-// 🔥 3个默认推荐筹码 - 根据余额动态调整
-const defaultChips = computed((): ChipData[] => {
-  const balance = currentBalance.value
-  let defaultValues: number[] = []
-
-  // 根据余额智能推荐3个筹码
-  if (balance >= 50000) {
-    defaultValues = [100, 1000, 10000]
-  } else if (balance >= 10000) {
-    defaultValues = [50, 500, 5000]
-  } else if (balance >= 1000) {
-    defaultValues = [10, 50, 100]
-  } else if (balance >= 100) {
-    defaultValues = [1, 5, 10]
-  } else {
-    defaultValues = [1, 5, 10]
-  }
-
-  // 过滤出可用的筹码
-  return availableChips.value.filter(chip =>
-    defaultValues.includes(chip.value) && isAffordable(chip.value)
-  ).slice(0, 3)
+  return bettingStore?.availableChips || []
 })
 
 // 方法
@@ -202,7 +165,7 @@ const getChipColor = (value: number): string => {
   return '#95a5a6' // 灰色 - 小额
 }
 
-// 🔥 切换筹码选择（最多3个）
+// 🔥 修改：切换筹码选择（恰好3个）
 const toggleChipSelection = (chip: ChipData) => {
   if (!isAffordable(chip.value)) {
     console.log('💰 余额不足，无法选择此筹码')
@@ -218,13 +181,15 @@ const toggleChipSelection = (chip: ChipData) => {
   } else {
     // 如果未选中，检查是否已达到最大数量
     if (selectedDisplayChips.value.length >= 3) {
-      console.log('⚠️ 最多只能选择3个筹码')
-      return
+      // 🔥 修改：替换策略 - 替换最后一个选中的筹码
+      selectedDisplayChips.value.pop()
+      selectedDisplayChips.value.push(chip)
+      console.log('🔄 替换筹码为:', chip.value)
+    } else {
+      // 添加到选择列表
+      selectedDisplayChips.value.push(chip)
+      console.log('➕ 选择筹码:', chip.value)
     }
-
-    // 添加到选择列表
-    selectedDisplayChips.value.push(chip)
-    console.log('➕ 选择筹码:', chip.value)
   }
 
   // 添加触觉反馈
@@ -233,32 +198,38 @@ const toggleChipSelection = (chip: ChipData) => {
   }
 }
 
-// 🔥 确认选择 - 更新 bettingStore 的显示筹码并关闭面板
+// 🔥 修改：确认选择 - 确保恰好3个筹码
 const confirmSelection = () => {
-  if (selectedDisplayChips.value.length > 0) {
-    try {
-      // 🔥 更新 bettingStore 的显示筹码列表（如果有相关方法）
-      if (bettingStore?.updateDisplayChips) {
-        bettingStore.updateDisplayChips(selectedDisplayChips.value)
-      }
+  if (selectedDisplayChips.value.length !== 3) {
+    console.warn('⚠️ 请选择恰好3个筹码')
+    return
+  }
 
-      // 🔥 如果选择了筹码，将第一个设为当前选中筹码
-      if (bettingStore?.selectChip && selectedDisplayChips.value[0]) {
-        bettingStore.selectChip(selectedDisplayChips.value[0].value)
-      }
-
-      console.log('✅ 确认选择筹码:', selectedDisplayChips.value.map(c => c.value))
-
-      // 🔥 关闭筹码选择器
-      handleClose()
-
-      // 添加成功反馈
-      if (navigator.vibrate) {
-        navigator.vibrate([50, 50, 50])
-      }
-    } catch (error) {
-      console.error('❌ 确认选择筹码失败:', error)
+  try {
+    // 🔥 调用 bettingStore 的 updateDisplayChips 方法
+    if (bettingStore?.updateDisplayChips) {
+      bettingStore.updateDisplayChips(selectedDisplayChips.value)
+    } else {
+      console.error('❌ bettingStore.updateDisplayChips 方法不存在')
+      return
     }
+
+    // 🔥 如果选择了筹码，将第一个设为当前选中筹码
+    if (bettingStore?.selectChip && selectedDisplayChips.value[0]) {
+      bettingStore.selectChip(selectedDisplayChips.value[0].value)
+    }
+
+    console.log('✅ 确认选择筹码:', selectedDisplayChips.value.map(c => c.value))
+
+    // 🔥 关闭筹码选择器
+    handleClose()
+
+    // 添加成功反馈
+    if (navigator.vibrate) {
+      navigator.vibrate([50, 50, 50])
+    }
+  } catch (error) {
+    console.error('❌ 确认选择筹码失败:', error)
   }
 }
 
@@ -283,22 +254,20 @@ const handleImageError = (event: Event) => {
   console.warn('⚠️ 筹码图片加载失败:', img.alt)
 }
 
-// 🔥 监听面板显示状态，自动选择当前显示的筹码
+// 🔥 修改：监听面板显示状态，自动同步当前显示的筹码
 watch(() => uiStore.showChipSelector, (newVisible) => {
   if (newVisible) {
     // 打开时，获取当前显示的筹码列表
     const currentDisplayChips = bettingStore?.getDisplayChipsData || []
 
-    if (currentDisplayChips.length > 0) {
+    if (currentDisplayChips.length >= 3) {
       // 选择当前显示的筹码
       selectedDisplayChips.value = [...currentDisplayChips].slice(0, 3)
       console.log('🎯 自动选择当前显示筹码:', selectedDisplayChips.value.map(c => c.value))
     } else {
-      // 如果没有显示筹码，选择默认的3个筹码
-      const defaultSelection = availableChips.value
-        .filter(chip => isAffordable(chip.value))
-        .slice(0, 3)
-      selectedDisplayChips.value = defaultSelection
+      // 🔥 如果没有足够的显示筹码，使用默认筹码
+      const defaultChips = bettingStore?.DEFAULT_DISPLAY_CHIPS || []
+      selectedDisplayChips.value = [...defaultChips].slice(0, 3)
       console.log('🎯 选择默认筹码:', selectedDisplayChips.value.map(c => c.value))
     }
   } else {
@@ -307,14 +276,47 @@ watch(() => uiStore.showChipSelector, (newVisible) => {
   }
 })
 
+// 🔥 新增：智能筹码推荐
+const getSmartRecommendations = (): ChipData[] => {
+  const balance = currentBalance.value
+  let recommendedValues: number[] = []
+
+  // 根据余额智能推荐3个筹码
+  if (balance >= 50000) {
+    recommendedValues = [100, 1000, 10000]
+  } else if (balance >= 10000) {
+    recommendedValues = [50, 500, 5000]
+  } else if (balance >= 1000) {
+    recommendedValues = [10, 50, 100]
+  } else if (balance >= 100) {
+    recommendedValues = [1, 5, 10]
+  } else {
+    recommendedValues = [1, 5, 10]
+  }
+
+  // 过滤出可用的筹码
+  return availableChips.value
+    .filter(chip => recommendedValues.includes(chip.value) && isAffordable(chip.value))
+    .slice(0, 3)
+}
+
+// 🔥 新增：应用智能推荐
+const applySmartRecommendations = () => {
+  const recommendations = getSmartRecommendations()
+  if (recommendations.length === 3) {
+    selectedDisplayChips.value = recommendations
+    console.log('🤖 应用智能推荐:', recommendations.map(c => c.value))
+  }
+}
+
 // 生命周期
 onMounted(() => {
-  console.log('🎰 筹码选择器组件挂载 [uiStore版]', {
+  console.log('🎰 筹码选择器组件挂载 [修复版]', {
     balance: currentBalance.value,
     availableChipsCount: availableChips.value.length,
-    defaultChipsCount: defaultChips.value.length,
     hasUIStore: !!uiStore,
-    hasBettingStore: !!bettingStore
+    hasBettingStore: !!bettingStore,
+    hasUpdateMethod: !!bettingStore?.updateDisplayChips
   })
 })
 </script>
@@ -431,8 +433,8 @@ onMounted(() => {
 
 /* 🔥 当前选中的筹码显示区域 */
 .current-selection {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(24, 144, 255, 0.1);
+  border: 1px solid rgba(24, 144, 255, 0.3);
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 24px;
@@ -445,9 +447,9 @@ onMounted(() => {
 }
 
 .selection-label {
-  color: rgba(255, 255, 255, 0.7);
+  color: #69c0ff;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .selected-chips-display {
@@ -462,18 +464,19 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 8px;
-  background: rgba(24, 144, 255, 0.1);
-  border: 1px solid rgba(24, 144, 255, 0.3);
+  padding: 12px;
+  background: rgba(24, 144, 255, 0.15);
+  border: 2px solid rgba(24, 144, 255, 0.4);
   border-radius: 12px;
-  min-width: 60px;
+  min-width: 70px;
+  animation: chipSelectedPulse 0.3s ease-out;
 }
 
 .selected-chip-image {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
+  filter: drop-shadow(0 2px 8px rgba(24, 144, 255, 0.4));
 }
 
 .selected-chip-item .chip-value {
@@ -487,6 +490,9 @@ onMounted(() => {
   font-style: italic;
   padding: 20px;
   text-align: center;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  width: 100%;
 }
 
 /* 🔥 节标题 */
@@ -539,6 +545,7 @@ onMounted(() => {
   border-color: #1890ff;
   box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.3), 0 8px 25px rgba(24, 144, 255, 0.4);
   transform: translateY(-2px);
+  animation: chipActivePulse 0.5s ease-out;
 }
 
 /* 🔥 禁用状态 */
@@ -611,6 +618,7 @@ onMounted(() => {
   justify-content: center;
   color: white;
   box-shadow: 0 2px 8px rgba(24, 144, 255, 0.4);
+  animation: selectedIndicatorPulse 2s ease-in-out infinite;
 }
 
 .insufficient-badge {
@@ -675,6 +683,7 @@ onMounted(() => {
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* 🔥 动画效果 */
@@ -695,6 +704,40 @@ onMounted(() => {
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes chipSelectedPulse {
+  from {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes chipActivePulse {
+  0% {
+    transform: translateY(-2px) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.05);
+  }
+  100% {
+    transform: translateY(-2px) scale(1);
+  }
+}
+
+@keyframes selectedIndicatorPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
   }
 }
 

@@ -1,4 +1,4 @@
-<!-- src/components/BetArea/ChipDisplay.vue - 修复版：统一使用 uiStore -->
+<!-- src/components/BetArea/ChipDisplay.vue - 修复版：完全依赖 bettingStore -->
 <template>
   <div class="chip-display">
     <!-- 🔥 保持原始横向布局，只增强效果 -->
@@ -39,7 +39,7 @@
         <div class="last-bet-amount" v-if="lastBetAmount > 0">¥{{ formatAmount(lastBetAmount) }}</div>
       </button>
 
-      <!-- 🔥 筹码选择区域 - 保持原始布局，只增强效果 -->
+      <!-- 🔥 筹码选择区域 - 完全依赖 bettingStore.getDisplayChipsData -->
       <div class="chip-selection-area">
         <div
           v-for="chip in displayChips"
@@ -127,7 +127,7 @@ let uiStore: any = null
 
 try {
   bettingStore = useBettingStore()
-  uiStore = useUIStore() // 🔥 新增：使用 uiStore
+  uiStore = useUIStore()
 } catch (error) {
   console.error('❌ Store 初始化失败:', error)
   // 创建默认对象避免错误
@@ -153,36 +153,23 @@ try {
   }
 }
 
-// 🔥 默认筹码数据
-const defaultChipsData: ChipData[] = [
-  {
-    id: 1,
-    value: 10,
-    name: '10元',
-    displayValue: '10',
-    image: '/src/assets/images/chips/B_10.png'
-  },
-  {
-    id: 2,
-    value: 50,
-    name: '50元',
-    displayValue: '50',
-    image: '/src/assets/images/chips/B_50.png'
-  },
-  {
-    id: 3,
-    value: 100,
-    name: '100元',
-    displayValue: '100',
-    image: '/src/assets/images/chips/B_100.png'
-  }
-]
-
-// 计算属性
+// 🔥 计算属性 - 完全依赖 bettingStore
 const displayChips = computed(() => {
+  // 🔥 直接使用 bettingStore.getDisplayChipsData，它现在返回完整的 ChipData 对象
   const storeChips = bettingStore?.getDisplayChipsData || []
-  const chips = storeChips.length > 0 ? storeChips : defaultChipsData
-  return chips.slice(0, props.chipCount)
+
+  // 确保返回的数据格式正确
+  if (Array.isArray(storeChips) && storeChips.length > 0) {
+    // 检查第一个元素是否包含必要的属性
+    const firstChip = storeChips[0]
+    if (firstChip && typeof firstChip === 'object' && 'value' in firstChip && 'image' in firstChip) {
+      return storeChips.slice(0, props.chipCount)
+    }
+  }
+
+  // 🔥 如果 store 数据无效，使用 DEFAULT_DISPLAY_CHIPS
+  const defaultChips = bettingStore?.DEFAULT_DISPLAY_CHIPS || []
+  return defaultChips.slice(0, props.chipCount)
 })
 
 const currentChip = computed(() => {
@@ -190,7 +177,7 @@ const currentChip = computed(() => {
 })
 
 const availableBalance = computed(() => {
-  return bettingStore?.availableBalance || 0
+  return bettingStore?.balance || 0
 })
 
 const totalBetAmount = computed(() => {
@@ -251,6 +238,9 @@ const lastBetAmount = computed(() => {
 
 // 方法
 const formatChipValue = (value: number): string => {
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(0)}M`
+  }
   if (value >= 1000) {
     return `${(value / 1000).toFixed(0)}K`
   }
@@ -280,8 +270,14 @@ const handleUndo = () => {
   if (!canUndo.value) return
 
   try {
-    bettingStore?.clearBets?.()
-    console.log('↩️ 执行撤销操作')
+    // 🔥 修改：使用正确的撤销方法
+    if (bettingStore?.undoLastBet) {
+      bettingStore.undoLastBet()
+      console.log('↩️ 执行撤销操作')
+    } else if (bettingStore?.clearBets) {
+      bettingStore.clearBets()
+      console.log('↩️ 执行清空投注')
+    }
   } catch (error) {
     console.error('❌ 撤销失败:', error)
   }
@@ -291,8 +287,14 @@ const handleRepeat = () => {
   if (!canRepeat.value) return
 
   try {
-    bettingStore?.rebet?.()
-    console.log('🔄 执行重复投注')
+    // 🔥 修改：使用正确的重复投注方法
+    if (bettingStore?.repeatLastBets) {
+      bettingStore.repeatLastBets()
+      console.log('🔄 执行重复投注')
+    } else if (bettingStore?.rebet) {
+      bettingStore.rebet()
+      console.log('🔄 执行重复投注 (兼容方法)')
+    }
   } catch (error) {
     console.error('❌ 重复投注失败:', error)
   }
@@ -330,11 +332,14 @@ const handleImageError = (event: Event) => {
 
 // 生命周期
 onMounted(() => {
-  console.log('🎰 筹码显示组件挂载 [uiStore版]', {
+  console.log('🎰 筹码显示组件挂载 [修复版]', {
     selectedChip: currentChip.value,
     balance: availableBalance.value,
     displayChipsCount: displayChips.value.length,
-    hasUIStore: !!uiStore
+    displayChipsData: displayChips.value.map(c => ({ value: c.value, id: c.id })),
+    hasUIStore: !!uiStore,
+    hasBettingStore: !!bettingStore,
+    hasGetDisplayChipsData: !!bettingStore?.getDisplayChipsData
   })
 })
 </script>

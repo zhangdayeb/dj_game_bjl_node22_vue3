@@ -364,7 +364,9 @@ export const useBettingStore = defineStore('betting', () => {
     return chips
   }
 
-  // 计算投注金额（包含限红和余额检查）
+  // 🔥 修复后的投注计算函数 - src/stores/bettingStore.ts
+
+  // 计算投注金额（修复累加投注逻辑）
   const calculateBetAmount = (betType: BaccaratBetType, selectedAmount: number): BetResult => {
     const limits = betLimits.value[betType]
     const zoneName = BET_ZONE_CONFIGS[betType].displayName
@@ -373,53 +375,77 @@ export const useBettingStore = defineStore('betting', () => {
       return { success: false, message: '投注区域配置错误' }
     }
 
-    let finalAmount = selectedAmount
+    // 🔥 关键修复：获取当前该区域的投注金额
+    const currentBetAmount = currentBets[betType] || 0
+
+    let actualAmount = selectedAmount
     let adjustmentMessage = ''
 
     // 1. 余额检查
-    if (finalAmount > balance.value) {
-      finalAmount = balance.value
+    if (actualAmount > balance.value) {
+      actualAmount = balance.value
       adjustmentMessage = `按可用余额投注 $${balance.value.toLocaleString()}`
     }
 
-    // 2. 最终检查：如果最小限红 > 余额，则投注失败
-    if (limits.min > balance.value) {
-      return {
-        success: false,
-        message: `余额不足，${zoneName}最小投注为 $${limits.min.toLocaleString()}，当前余额 $${balance.value.toLocaleString()}`
+    // 2. 如果当前没有投注，检查最小限红
+    if (currentBetAmount === 0) {
+      // 首次投注：确保满足最小限红
+      if (actualAmount < limits.min) {
+        actualAmount = limits.min
+        adjustmentMessage = `投注金额已调整至最小限红 $${limits.min.toLocaleString()}`
+      }
+    } else {
+      // 🔥 累加投注：直接使用筹码面额，不强制调整到最小限红
+      // 只需检查累加后是否超过最大限红
+      const newTotal = currentBetAmount + actualAmount
+      if (newTotal > limits.max) {
+        // 如果累加后超过最大限红，调整为最大限红减去当前投注
+        actualAmount = limits.max - currentBetAmount
+        if (actualAmount <= 0) {
+          return {
+            success: false,
+            message: `${zoneName}已达最大限红 $${limits.max.toLocaleString()}`
+          }
+        }
+        adjustmentMessage = `投注金额已调整，累计不超过最大限红 $${limits.max.toLocaleString()}`
       }
     }
 
-    // 3. 限红检查
-    if (finalAmount < limits.min) {
-      finalAmount = limits.min
-      adjustmentMessage = `投注金额已调整至最小限红 $${limits.min.toLocaleString()}`
+    // 3. 最终余额检查
+    if (actualAmount > balance.value) {
+      return {
+        success: false,
+        message: `余额不足，需要 $${actualAmount.toLocaleString()}，当前余额 $${balance.value.toLocaleString()}`
+      }
     }
 
-    if (finalAmount > limits.max) {
-      finalAmount = limits.max
-      adjustmentMessage = `投注金额已调整至最大限红 $${limits.max.toLocaleString()}`
+    // 4. 检查最终投注总额是否满足限红要求
+    const finalTotal = currentBetAmount + actualAmount
+    if (finalTotal > limits.max) {
+      return {
+        success: false,
+        message: `超过最大限红，${zoneName}最大投注为 $${limits.max.toLocaleString()}`
+      }
     }
 
     return {
       success: true,
-      amount: finalAmount,
-      message: adjustmentMessage || `投注成功：${zoneName} $${finalAmount.toLocaleString()}`
+      amount: actualAmount,
+      message: adjustmentMessage || `投注成功：${zoneName} +$${actualAmount.toLocaleString()} (总计: $${finalTotal.toLocaleString()})`
     }
   }
 
-
-  // 执行投注
+  // 🔥 修复后的执行投注函数
   const placeBet = (betType: BaccaratBetType, amount?: number): BetResult => {
     // 检查游戏状态
     if (gamePhase.value !== 'betting') {
       return { success: false, message: '当前不在投注阶段' }
     }
 
-    // 🔥 强制使用当前选中的筹码值，忽略传入参数
+    // 🔥 使用当前选中的筹码值
     const actualAmount = selectedChipRef.value
 
-    // 计算投注金额
+    // 🔥 使用修复后的计算逻辑
     const result = calculateBetAmount(betType, actualAmount)
     if (!result.success) {
       return result
@@ -427,7 +453,7 @@ export const useBettingStore = defineStore('betting', () => {
 
     const finalAmount = result.amount!
 
-    // 执行投注
+    // 🔥 累加投注（这里不变，累加逻辑在calculateBetAmount中处理）
     currentBets[betType] += finalAmount
     simulationData[betType].userAmount = currentBets[betType]
 
@@ -439,8 +465,12 @@ export const useBettingStore = defineStore('betting', () => {
       timestamp: Date.now()
     })
 
+    console.log(`💰 投注成功: ${betType} +${finalAmount} (总计: ${currentBets[betType]})`)
+
     return result
   }
+
+
 
   // 撤销投注
   const undoLastBet = (): boolean => {

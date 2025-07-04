@@ -1,161 +1,159 @@
+<!-- src/components/Effects/ResultEffect.vue -->
 <template>
-  <div v-if="show" class="result-effect-overlay">
+  <div class="result-effect-overlay">
     <div class="result-effect-container">
-      <!-- 背景遮罩 -->
-      <div class="backdrop" @click="handleBackdropClick"></div>
-
-      <!-- 开牌区域 -->
-      <div class="cards-display">
-        <!-- 庄家区域 -->
-        <div class="player-section banker-section">
-          <div class="player-title">庄家</div>
-          <div class="cards-container">
-            <div
-              v-for="(card, index) in bankerCards"
-              :key="`banker-${index}`"
-              class="card-slot"
-              :class="{ 'card-revealed': card.revealed }"
-              :style="{
-                animationDelay: `${index * cardRevealDelay}ms`,
-                zIndex: 10 + index
-              }"
-            >
-              <!-- 牌背面 -->
-              <div class="card-back">
-                <img :src="cardBackImage" alt="牌背" />
-              </div>
-
-              <!-- 牌正面 -->
-              <div class="card-front" v-if="card.image">
-                <img :src="getCardImage(card.image)" :alt="card.image" />
-              </div>
-            </div>
-          </div>
-
-          <!-- 庄家点数 -->
-          <div class="player-score" :class="{ 'score-revealed': scoreRevealed }">
-            <span class="score-label">点数:</span>
-            <span class="score-value">{{ bankerScore }}</span>
-          </div>
-        </div>
-
-        <!-- VS 分隔符 -->
-        <div class="vs-separator">
-          <div class="vs-text">VS</div>
-        </div>
-
-        <!-- 闲家区域 -->
-        <div class="player-section player-section-right">
-          <div class="player-title">闲家</div>
-          <div class="cards-container">
-            <div
-              v-for="(card, index) in playerCards"
-              :key="`player-${index}`"
-              class="card-slot"
-              :class="{ 'card-revealed': card.revealed }"
-              :style="{
-                animationDelay: `${(bankerCards.length + index) * cardRevealDelay}ms`,
-                zIndex: 10 + index
-              }"
-            >
-              <!-- 牌背面 -->
-              <div class="card-back">
-                <img :src="cardBackImage" alt="牌背" />
-              </div>
-
-              <!-- 牌正面 -->
-              <div class="card-front" v-if="card.image">
-                <img :src="getCardImage(card.image)" :alt="card.image" />
-              </div>
-            </div>
-          </div>
-
-          <!-- 闲家点数 -->
-          <div class="player-score" :class="{ 'score-revealed': scoreRevealed }">
-            <span class="score-label">点数:</span>
-            <span class="score-value">{{ playerScore }}</span>
-          </div>
-        </div>
+      <!-- 背景装饰 -->
+      <div class="bg-decoration">
+        <div class="sparkle" v-for="i in 20" :key="i" :style="getSparkleStyle(i)"></div>
       </div>
 
-      <!-- 结果显示 -->
-      <div class="result-display" :class="{ 'result-revealed': resultRevealed }">
-        <div class="result-winner" :class="winnerClass">
-          <div class="winner-text">{{ winnerText }}</div>
-          <div class="winner-subtitle" v-if="specialWin">{{ specialWin }}</div>
+      <!-- 主要内容 -->
+      <div class="result-content" :class="{ 'revealed': allCardsRevealed }">
+        <!-- 标题 -->
+        <div class="effect-title">
+          <h2>开牌结果</h2>
         </div>
 
-        <!-- 中奖区域闪烁效果 -->
-        <div class="flash-areas" v-if="flashAreas.length > 0">
-          <div class="flash-text">中奖区域</div>
-          <div class="flash-items">
+        <!-- 卡牌区域 -->
+        <div class="cards-section">
+          <!-- 庄家牌 -->
+          <div class="player-cards banker-cards">
+            <div class="player-label">庄家</div>
+            <div class="cards-container">
+              <div
+                v-for="(card, index) in bankerCards"
+                :key="`banker-${index}`"
+                class="card-wrapper"
+                :style="{ animationDelay: `${index * 0.3}s` }"
+              >
+                <div class="card" :class="{ 'revealed': card.revealed }">
+                  <div class="card-front">
+                    <img :src="getCardImage(card.image)" :alt="card.image" />
+                  </div>
+                  <div class="card-back">
+                    <img :src="cardBackImage" alt="牌背" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="score" :class="{ 'revealed': scoreRevealed }">
+              {{ bankerScore }}
+            </div>
+          </div>
+
+          <!-- VS 标识 -->
+          <div class="vs-indicator">
+            <span>VS</span>
+          </div>
+
+          <!-- 闲家牌 -->
+          <div class="player-cards player-cards-section">
+            <div class="player-label">闲家</div>
+            <div class="cards-container">
+              <div
+                v-for="(card, index) in playerCards"
+                :key="`player-${index}`"
+                class="card-wrapper"
+                :style="{ animationDelay: `${(bankerCards.length + index) * 0.3}s` }"
+              >
+                <div class="card" :class="{ 'revealed': card.revealed }">
+                  <div class="card-front">
+                    <img :src="getCardImage(card.image)" :alt="card.image" />
+                  </div>
+                  <div class="card-back">
+                    <img :src="cardBackImage" alt="牌背" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="score" :class="{ 'revealed': scoreRevealed }">
+              {{ playerScore }}
+            </div>
+          </div>
+        </div>
+
+        <!-- 结果显示 -->
+        <div class="result-display" :class="[winnerClass, { 'revealed': resultRevealed }]">
+          <div class="winner-text">{{ winnerText }}</div>
+          <div v-if="specialWin" class="special-win">{{ specialWin }}</div>
+        </div>
+
+        <!-- 中奖区域闪烁 -->
+        <div v-if="flashAreas.length > 0" class="flash-areas">
+          <div class="flash-title">中奖区域</div>
+          <div class="flash-zones">
             <span
               v-for="area in flashAreas"
               :key="area"
-              class="flash-item"
+              class="flash-zone"
             >
               {{ area }}
             </span>
           </div>
         </div>
-      </div>
 
-      <!-- 关闭按钮 -->
-      <button class="close-button" @click="handleClose" v-if="showCloseButton">
-        <svg viewBox="0 0 24 24" width="24" height="24">
-          <path fill="currentColor" d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"/>
-        </svg>
-      </button>
+        <!-- 关闭按钮 -->
+        <button
+          v-if="showCloseButton"
+          class="close-button"
+          @click="handleClose"
+        >
+          继续游戏
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
-// 牌面数据接口
+// 类型定义
 interface CardData {
   image: string
   revealed: boolean
 }
 
-// 开牌结果数据接口
 interface ResultData {
-  result: any        // 游戏计算结果
-  info: {
-    zhuang: Record<string, string>  // 庄家牌面信息
-    xian: Record<string, string>    // 闲家牌面信息
+  result: {
+    zhuang_score: number
+    xian_score: number
   }
-  pai_flash: string[]  // 中奖区域闪烁效果
+  info: {
+    zhuang: Record<string, string>
+    xian: Record<string, string>
+  }
+  pai_flash?: string[]
 }
 
+// Props
 interface Props {
-  show: boolean
-  resultData?: ResultData
+  resultData?: ResultData | null
   autoClose?: boolean
   closeDuration?: number
   cardRevealDelay?: number
-  allowBackdropClose?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  resultData: null,
   autoClose: true,
   closeDuration: 8000,
-  cardRevealDelay: 800,
-  allowBackdropClose: false
+  cardRevealDelay: 800
 })
 
+// 事件定义
 const emit = defineEmits<{
   close: []
   complete: []
 }>()
 
-// 状态管理
+// 响应式数据
 const bankerCards = ref<CardData[]>([])
 const playerCards = ref<CardData[]>([])
 const scoreRevealed = ref(false)
 const resultRevealed = ref(false)
 const showCloseButton = ref(false)
+const allCardsRevealed = ref(false)
 
 // 计算属性
 const bankerScore = computed(() => {
@@ -194,6 +192,15 @@ const winnerClass = computed(() => {
 
 const specialWin = computed(() => {
   // 可以根据特殊胜利条件添加逻辑
+  const banker = bankerScore.value
+  const player = playerScore.value
+
+  if (banker === 8 || banker === 9) return '天牌'
+  if (player === 8 || player === 9) return '天牌'
+  if (banker === 6 && bankerCards.value.length === 2) return '幸运6'
+  if (banker === 7 && bankerCards.value.length === 3) return '龙7'
+  if (player === 8 && playerCards.value.length === 3) return '熊猫8'
+
   return ''
 })
 
@@ -201,19 +208,42 @@ const flashAreas = computed(() => {
   return props.resultData?.pai_flash || []
 })
 
-// 牌背图片
 const cardBackImage = computed(() => {
   return '/src/assets/images/poker/m.png'
 })
 
-// 获取牌面图片
+// 方法
 const getCardImage = (cardName: string) => {
   return `/src/assets/images/poker/${cardName}`
 }
 
-// 初始化牌面数据
+const getSparkleStyle = (index: number) => {
+  const randomX = Math.random() * 100
+  const randomY = Math.random() * 100
+  const randomDelay = Math.random() * 3
+  const randomDuration = 2 + Math.random() * 2
+
+  return {
+    left: `${randomX}%`,
+    top: `${randomY}%`,
+    animationDelay: `${randomDelay}s`,
+    animationDuration: `${randomDuration}s`
+  }
+}
+
 const initializeCards = () => {
-  if (!props.resultData?.info) return
+  if (!props.resultData?.info) {
+    // 默认数据用于测试
+    bankerCards.value = [
+      { image: 'h1.png', revealed: false },
+      { image: 's5.png', revealed: false }
+    ]
+    playerCards.value = [
+      { image: 'c7.png', revealed: false },
+      { image: 'h9.png', revealed: false }
+    ]
+    return
+  }
 
   const { zhuang, xian } = props.resultData.info
 
@@ -235,10 +265,7 @@ const initializeCards = () => {
   })
 }
 
-// 开始翻牌动画
 const startRevealAnimation = () => {
-  if (!props.show) return
-
   const totalCards = bankerCards.value.length + playerCards.value.length
 
   // 依次翻牌
@@ -254,7 +281,7 @@ const startRevealAnimation = () => {
     }, (bankerCards.value.length + index) * props.cardRevealDelay)
   })
 
-  // 显示点数
+  // 显示分数
   setTimeout(() => {
     scoreRevealed.value = true
   }, totalCards * props.cardRevealDelay + 500)
@@ -262,76 +289,43 @@ const startRevealAnimation = () => {
   // 显示结果
   setTimeout(() => {
     resultRevealed.value = true
+    allCardsRevealed.value = true
+  }, totalCards * props.cardRevealDelay + 1000)
+
+  // 显示关闭按钮
+  setTimeout(() => {
     showCloseButton.value = true
-    emit('complete')
   }, totalCards * props.cardRevealDelay + 1500)
 
   // 自动关闭
   if (props.autoClose) {
     setTimeout(() => {
-      handleClose()
+      handleComplete()
     }, props.closeDuration)
   }
 }
 
-// 重置状态
-const resetState = () => {
-  bankerCards.value = []
-  playerCards.value = []
-  scoreRevealed.value = false
-  resultRevealed.value = false
-  showCloseButton.value = false
-}
-
-// 处理关闭
 const handleClose = () => {
   emit('close')
 }
 
-// 处理背景点击
-const handleBackdropClick = () => {
-  if (props.allowBackdropClose) {
-    handleClose()
-  }
+const handleComplete = () => {
+  emit('complete')
 }
 
-// 监听显示状态
-watch(() => props.show, (newShow) => {
-  if (newShow) {
-    resetState()
-    initializeCards()
-
-    // 延迟开始动画，确保DOM已渲染
-    setTimeout(() => {
-      startRevealAnimation()
-    }, 300)
-  }
-})
-
-// 监听结果数据变化
-watch(() => props.resultData, (newData) => {
-  if (newData && props.show) {
-    resetState()
-    initializeCards()
-    setTimeout(() => {
-      startRevealAnimation()
-    }, 300)
-  }
-})
-
-// 键盘事件处理
-const handleKeydown = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && props.show) {
-    handleClose()
-  }
-}
-
+// 生命周期
 onMounted(() => {
-  document.addEventListener('keydown', handleKeydown)
+  console.log('🎴 开牌特效组件挂载')
+  initializeCards()
+
+  // 开始动画
+  setTimeout(() => {
+    startRevealAnimation()
+  }, 500)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', handleKeydown)
+  console.log('🎴 开牌特效组件卸载')
 })
 </script>
 
@@ -342,321 +336,423 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 9999;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeIn 0.3s ease-out;
+  animation: overlayFadeIn 0.5s ease-out;
 }
 
-.backdrop {
+.result-effect-container {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  padding: 20px;
+}
+
+.bg-decoration {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(4px);
+  pointer-events: none;
+  overflow: hidden;
 }
 
-.result-effect-container {
-  position: relative;
-  width: 90%;
-  max-width: 800px;
-  background: linear-gradient(135deg, #1a4d3a 0%, #2d5016 100%);
+.sparkle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: linear-gradient(45deg, #ffd700, #ffeb3b);
+  border-radius: 50%;
+  animation: sparkleFloat 3s ease-in-out infinite;
+}
+
+.result-content {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   border-radius: 20px;
-  border: 3px solid gold;
-  padding: 30px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 215, 0, 0.3);
+  padding: 40px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  animation: contentSlideIn 0.8s ease-out;
 }
 
-.cards-display {
+.result-content.revealed {
+  border-color: rgba(255, 215, 0, 0.6);
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+}
+
+.effect-title h2 {
+  color: #ffd700;
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 30px 0;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.cards-section {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 40px;
   margin-bottom: 30px;
-  gap: 20px;
 }
 
-.player-section {
-  flex: 1;
-  text-align: center;
+.player-cards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
 }
 
-.player-title {
-  font-size: 24px;
-  font-weight: bold;
-  color: gold;
-  margin-bottom: 20px;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+.player-label {
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .cards-container {
   display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 20px;
-  min-height: 120px;
+  gap: 8px;
 }
 
-.card-slot {
-  position: relative;
+.card-wrapper {
+  animation: cardDrop 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.card {
   width: 80px;
-  height: 120px;
-  cursor: pointer;
+  height: 112px;
+  position: relative;
   transform-style: preserve-3d;
-  transition: transform 0.6s ease-in-out;
+  transition: transform 0.8s ease-in-out;
+  cursor: pointer;
 }
 
-.card-slot.card-revealed {
+.card.revealed {
   transform: rotateY(180deg);
-  animation: cardReveal 0.8s ease-out forwards;
 }
 
-.card-back,
-.card-front {
+.card-front,
+.card-back {
   position: absolute;
   width: 100%;
   height: 100%;
   backface-visibility: hidden;
   border-radius: 8px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-
-.card-back {
-  background: linear-gradient(135deg, #8B0000, #A52A2A);
-  border: 2px solid #FFD700;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .card-front {
   transform: rotateY(180deg);
-  background: white;
-  border: 2px solid #333;
 }
 
-.card-back img,
-.card-front img {
+.card-back {
+  transform: rotateY(0deg);
+}
+
+.card-front img,
+.card-back img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 6px;
 }
 
-.vs-separator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.vs-text {
-  font-size: 36px;
-  font-weight: bold;
-  color: gold;
-  background: linear-gradient(135deg, #FFD700, #FFA500);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-  animation: pulse 2s infinite;
-}
-
-.player-score {
-  font-size: 18px;
-  font-weight: bold;
-  color: white;
+.score {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffd700;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px 16px;
+  border-radius: 12px;
+  border: 2px solid #ffd700;
+  min-width: 60px;
   opacity: 0;
-  transform: translateY(20px);
+  transform: scale(0.8);
   transition: all 0.5s ease-out;
 }
 
-.player-score.score-revealed {
+.score.revealed {
   opacity: 1;
-  transform: translateY(0);
+  transform: scale(1);
+  animation: scoreReveal 0.5s ease-out;
 }
 
-.score-label {
-  color: #ccc;
-  margin-right: 8px;
-}
-
-.score-value {
-  color: gold;
+.vs-indicator {
   font-size: 24px;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .result-display {
-  text-align: center;
+  margin: 30px 0;
   opacity: 0;
-  transform: translateY(30px);
+  transform: translateY(20px);
   transition: all 0.6s ease-out;
 }
 
-.result-display.result-revealed {
+.result-display.revealed {
   opacity: 1;
   transform: translateY(0);
-}
-
-.result-winner {
-  margin-bottom: 20px;
 }
 
 .winner-text {
   font-size: 32px;
-  font-weight: bold;
-  text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+  font-weight: 700;
   margin-bottom: 10px;
+  text-shadow: 0 0 15px currentColor;
 }
 
-.winner-subtitle {
-  font-size: 18px;
-  opacity: 0.9;
+.winner-text {
+  animation: winnerGlow 2s ease-in-out infinite alternate;
 }
 
-.winner-banker {
+.result-display.winner-banker .winner-text {
   color: #ff6b6b;
 }
 
-.winner-player {
+.result-display.winner-player .winner-text {
   color: #4ecdc4;
 }
 
-.winner-tie {
-  color: #ffe66d;
+.result-display.winner-tie .winner-text {
+  color: #ffd93d;
+}
+
+.special-win {
+  font-size: 18px;
+  color: #ffd700;
+  font-weight: 600;
+  animation: specialWinPulse 1s ease-in-out infinite alternate;
 }
 
 .flash-areas {
-  margin-top: 20px;
+  margin: 20px 0;
+  padding: 16px;
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
 }
 
-.flash-text {
+.flash-title {
   font-size: 16px;
-  color: #ccc;
-  margin-bottom: 10px;
+  color: #ffd700;
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
-.flash-items {
+.flash-zones {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 8px;
+  justify-content: center;
 }
 
-.flash-item {
-  background: linear-gradient(135deg, #FFD700, #FFA500);
-  color: #000;
-  padding: 4px 12px;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: bold;
-  animation: flashPulse 1s infinite;
+.flash-zone {
+  background: rgba(255, 215, 0, 0.2);
+  color: #ffd700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  animation: flashZoneBlink 1s ease-in-out infinite alternate;
 }
 
 .close-button {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 40px;
-  height: 40px;
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, #ffd700 0%, #ffb300 100%);
+  color: #1a1a2e;
   border: none;
-  border-radius: 50%;
-  color: white;
+  padding: 12px 32px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   transition: all 0.3s ease;
+  margin-top: 20px;
+  opacity: 0;
+  animation: buttonFadeIn 0.5s ease-out 0.3s forwards;
 }
 
 .close-button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 215, 0, 0.4);
 }
 
-/* 动画定义 */
-@keyframes fadeIn {
+/* 动画 */
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes contentSlideIn {
   from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: translateY(50px) scale(0.9);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 
-@keyframes cardReveal {
+@keyframes cardDrop {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  from {
+    opacity: 0;
+    transform: translateY(-50px);
+  }
+}
+
+@keyframes scoreReveal {
   0% {
-    transform: rotateY(0deg) scale(0.8);
+    transform: scale(0.5);
+    opacity: 0;
   }
   50% {
-    transform: rotateY(90deg) scale(1.1);
+    transform: scale(1.2);
   }
   100% {
-    transform: rotateY(180deg) scale(1);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% {
     transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-}
-
-@keyframes flashPulse {
-  0%, 100% {
     opacity: 1;
+  }
+}
+
+@keyframes winnerGlow {
+  from {
+    text-shadow: 0 0 15px currentColor;
+  }
+  to {
+    text-shadow: 0 0 25px currentColor, 0 0 35px currentColor;
+  }
+}
+
+@keyframes specialWinPulse {
+  from {
     transform: scale(1);
   }
-  50% {
-    opacity: 0.7;
+  to {
     transform: scale(1.05);
+  }
+}
+
+@keyframes flashZoneBlink {
+  from {
+    background: rgba(255, 215, 0, 0.2);
+  }
+  to {
+    background: rgba(255, 215, 0, 0.4);
+  }
+}
+
+@keyframes sparkleFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(-20px) rotate(180deg);
+    opacity: 1;
+  }
+}
+
+@keyframes buttonFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .result-effect-container {
-    width: 95%;
+  .result-content {
     padding: 20px;
   }
 
-  .cards-display {
-    flex-direction: column;
-    gap: 30px;
+  .effect-title h2 {
+    font-size: 24px;
   }
 
-  .vs-separator {
+  .cards-section {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .vs-indicator {
+    order: 2;
+    font-size: 18px;
+    padding: 8px 16px;
+  }
+
+  .banker-cards {
     order: 1;
   }
 
-  .player-section {
-    order: 0;
+  .player-cards-section {
+    order: 3;
   }
 
-  .player-section-right {
-    order: 2;
-  }
-
-  .player-title {
-    font-size: 20px;
-  }
-
-  .vs-text {
-    font-size: 28px;
+  .card {
+    width: 60px;
+    height: 84px;
   }
 
   .winner-text {
     font-size: 24px;
   }
 
-  .card-slot {
-    width: 60px;
-    height: 90px;
+  .cards-container {
+    gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .result-effect-container {
+    padding: 10px;
+  }
+
+  .result-content {
+    padding: 16px;
+  }
+
+  .effect-title h2 {
+    font-size: 20px;
+    margin-bottom: 20px;
+  }
+
+  .card {
+    width: 50px;
+    height: 70px;
+  }
+
+  .score {
+    font-size: 18px;
+    padding: 6px 12px;
+  }
+
+  .winner-text {
+    font-size: 20px;
   }
 }
 </style>

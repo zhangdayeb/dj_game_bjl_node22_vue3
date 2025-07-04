@@ -7,7 +7,7 @@
         <div class="header-left">
           <div class="header-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
             </svg>
           </div>
           <h2 class="panel-title">设置</h2>
@@ -33,38 +33,40 @@
           </div>
 
           <div class="setting-items">
+            <!-- 背景音乐开关 -->
             <div class="setting-item">
               <div class="setting-info">
                 <div class="setting-label">背景音乐</div>
                 <div class="setting-desc">游戏背景音乐开关</div>
               </div>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  v-model="bgmEnabled"
-                  @change="handleBgmToggle"
-                >
-                <span class="slider">
-                  <span class="slider-thumb"></span>
-                </span>
-              </label>
+              <div class="setting-control">
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    v-model="bgmEnabled"
+                    @change="handleBgmToggle"
+                  >
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
 
+            <!-- 音效开关 -->
             <div class="setting-item">
               <div class="setting-info">
                 <div class="setting-label">音效</div>
                 <div class="setting-desc">游戏音效开关</div>
               </div>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  v-model="sfxEnabled"
-                  @change="handleSfxToggle"
-                >
-                <span class="slider">
-                  <span class="slider-thumb"></span>
-                </span>
-              </label>
+              <div class="setting-control">
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    v-model="sfxEnabled"
+                    @change="handleSfxToggle"
+                  >
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
@@ -74,22 +76,23 @@
           <div class="section-header">
             <div class="section-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
               </svg>
             </div>
             <h3 class="section-title">功能菜单</h3>
           </div>
 
           <div class="menu-items">
-            <div class="menu-item" @click="handleRecharge">
-              <div class="menu-icon recharge">
+            <!-- 投注记录 -->
+            <div class="menu-item" @click="handleBettingHistory">
+              <div class="menu-icon betting">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z"/>
+                  <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
                 </svg>
               </div>
               <div class="menu-info">
-                <div class="menu-label">充值</div>
-                <div class="menu-desc">账户充值</div>
+                <div class="menu-label">投注记录</div>
+                <div class="menu-desc">查看历史投注记录</div>
               </div>
               <div class="menu-arrow">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -98,10 +101,11 @@
               </div>
             </div>
 
-            <div class="menu-item" @click="handlePersonalCenter">
+            <!-- 个人中心 -->
+            <div class="menu-item" @click="handleVipCenter">
               <div class="menu-icon personal">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                  <path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"/>
                 </svg>
               </div>
               <div class="menu-info">
@@ -115,6 +119,7 @@
               </div>
             </div>
 
+            <!-- 客服 -->
             <div class="menu-item" @click="handleCustomerService">
               <div class="menu-icon service">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -140,32 +145,21 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useUIStore } from '@/stores/uiStore'
 
-// Props
-interface Props {
-  show?: boolean
-  initialBgmEnabled?: boolean
-  initialSfxEnabled?: boolean
-}
+// UI Store
+const uiStore = useUIStore()
 
-const props = withDefaults(defineProps<Props>(), {
-  show: false,
-  initialBgmEnabled: true,
-  initialSfxEnabled: true
-})
+// 本地状态 - 这些是组件内部的数据
+const bgmEnabled = ref(true)
+const sfxEnabled = ref(true)
 
-// Emits
+// 事件定义
 const emit = defineEmits<{
   close: []
-  bgmToggle: [enabled: boolean]
-  sfxToggle: [enabled: boolean]
 }>()
 
-// 响应式数据
-const bgmEnabled = ref(props.initialBgmEnabled)
-const sfxEnabled = ref(props.initialSfxEnabled)
-
-// 方法
+// 事件处理
 const handleClose = () => {
   emit('close')
 }
@@ -175,28 +169,28 @@ const handleOverlayClick = () => {
 }
 
 const handleBgmToggle = () => {
-  console.log('🎵 背景音乐切换:', bgmEnabled.value)
-  emit('bgmToggle', bgmEnabled.value)
+  console.log(`🎵 背景音乐: ${bgmEnabled.value ? '开启' : '关闭'}`)
+  // 这里调用实际的音频控制服务
 }
 
 const handleSfxToggle = () => {
-  console.log('🔊 音效切换:', sfxEnabled.value)
-  emit('sfxToggle', sfxEnabled.value)
+  console.log(`🔊 音效: ${sfxEnabled.value ? '开启' : '关闭'}`)
+  // 这里调用实际的音效控制服务
 }
 
-const handleRecharge = () => {
-  console.log('💳 跳转充值页面')
-  window.open('https://www.google.com', '_blank')
+const handleBettingHistory = () => {
+  uiStore.openBettingHistory()
+  emit('close') // 关闭当前设置面板
 }
 
-const handlePersonalCenter = () => {
-  console.log('👤 跳转个人中心')
-  window.open('https://www.google.com', '_blank')
+const handleVipCenter = () => {
+  console.log('👑 跳转会员中心')
+  window.open('/vip', '_blank')
 }
 
 const handleCustomerService = () => {
-  console.log('🎧 跳转客服页面')
-  window.open('https://www.google.com', '_blank')
+  console.log('🎧 联系客服')
+  window.open('/customer-service', '_blank')
 }
 </script>
 
@@ -205,37 +199,37 @@ const handleCustomerService = () => {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeIn 0.3s ease-out;
+  padding: 20px;
+  animation: overlayFadeIn 0.3s ease-out;
 }
 
 .settings-panel {
-  width: 90%;
-  max-width: 480px;
-  max-height: 90vh;
-  background: rgba(15, 15, 15, 0.95);
-  backdrop-filter: blur(20px);
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
   overflow: hidden;
-  animation: slideInUp 0.3s ease-out;
+  animation: panelSlideIn 0.3s ease-out;
 }
 
 .panel-header {
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 20px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.3);
 }
 
 .header-left {
@@ -247,7 +241,7 @@ const handleCustomerService = () => {
 .header-icon {
   width: 32px;
   height: 32px;
-  background: rgba(24, 144, 255, 0.2);
+  background: rgba(64, 169, 255, 0.2);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -256,36 +250,35 @@ const handleCustomerService = () => {
 }
 
 .panel-title {
-  margin: 0;
   font-size: 18px;
   font-weight: 600;
   color: white;
+  margin: 0;
 }
 
 .close-btn {
   width: 36px;
   height: 36px;
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
   border: none;
   border-radius: 8px;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
 }
 
 .close-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
   color: white;
-  transform: scale(1.05);
 }
 
 .panel-content {
   padding: 24px;
+  max-height: calc(80vh - 80px);
   overflow-y: auto;
-  max-height: calc(90vh - 80px);
 }
 
 .settings-section {
@@ -299,136 +292,73 @@ const handleCustomerService = () => {
 .section-header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 16px;
 }
 
 .section-icon {
-  width: 24px;
-  height: 24px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .section-title {
-  margin: 0;
   font-size: 16px;
   font-weight: 500;
   color: white;
+  margin: 0;
 }
 
-.setting-items {
+.setting-items,
+.menu-items {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
+}
+
+.setting-item,
+.menu-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.setting-item:hover,
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 .setting-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all 0.2s ease;
-}
-
-.setting-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .setting-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex: 1;
 }
 
-.setting-label {
+.setting-label,
+.menu-label {
   font-size: 14px;
   font-weight: 500;
   color: white;
+  margin-bottom: 4px;
 }
 
-.setting-desc {
+.setting-desc,
+.menu-desc {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.6);
-}
-
-.switch {
-  position: relative;
-  width: 48px;
-  height: 26px;
-  cursor: pointer;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 26px;
-  transition: all 0.3s ease;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.slider-thumb {
-  position: absolute;
-  content: "";
-  height: 20px;
-  width: 20px;
-  left: 2px;
-  bottom: 2px;
-  background: white;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-input:checked + .slider {
-  background: #40a9ff;
-  border-color: #40a9ff;
-}
-
-input:checked + .slider .slider-thumb {
-  transform: translateX(22px);
-}
-
-.menu-items {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.menu-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+  gap: 12px;
 }
 
 .menu-icon {
@@ -441,7 +371,7 @@ input:checked + .slider .slider-thumb {
   flex-shrink: 0;
 }
 
-.menu-icon.recharge {
+.menu-icon.betting {
   background: rgba(82, 196, 26, 0.2);
   color: #52c41a;
 }
@@ -458,20 +388,6 @@ input:checked + .slider .slider-thumb {
 
 .menu-info {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.menu-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: white;
-}
-
-.menu-desc {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
 }
 
 .menu-arrow {
@@ -484,16 +400,59 @@ input:checked + .slider .slider-thumb {
   transform: translateX(2px);
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* 开关样式 */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
 }
 
-@keyframes slideInUp {
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #40a9ff;
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+}
+
+/* 动画 */
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes panelSlideIn {
   from {
     opacity: 0;
     transform: translateY(30px) scale(0.95);
@@ -506,77 +465,21 @@ input:checked + .slider .slider-thumb {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+  .settings-panel-overlay {
+    padding: 10px;
+  }
+
   .settings-panel {
-    width: 95%;
     max-width: none;
+    width: 95%;
   }
 
   .panel-header {
     padding: 16px 20px;
   }
 
-  .panel-title {
-    font-size: 16px;
-  }
-
   .panel-content {
     padding: 20px;
-  }
-
-  .settings-section {
-    margin-bottom: 24px;
-  }
-
-  .setting-item,
-  .menu-item {
-    padding: 12px;
-  }
-}
-
-@media (max-width: 480px) {
-  .settings-panel {
-    width: 98%;
-    border-radius: 12px;
-  }
-
-  .panel-header {
-    padding: 14px 16px;
-  }
-
-  .header-icon {
-    width: 28px;
-    height: 28px;
-  }
-
-  .panel-title {
-    font-size: 15px;
-  }
-
-  .close-btn {
-    width: 32px;
-    height: 32px;
-  }
-
-  .panel-content {
-    padding: 16px;
-  }
-
-  .settings-section {
-    margin-bottom: 20px;
-  }
-
-  .section-title {
-    font-size: 15px;
-  }
-
-  .setting-item,
-  .menu-item {
-    padding: 10px;
-  }
-
-  .menu-icon {
-    width: 36px;
-    height: 36px;
   }
 }
 </style>

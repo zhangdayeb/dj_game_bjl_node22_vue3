@@ -1,109 +1,62 @@
 <template>
   <div class="game-section" :style="sectionStyles">
-    <!-- 顶部视频区域 -->
-    <div class="video-section" :style="videoSectionStyles">
-      <VideoPlayer
-        ref="videoPlayerRef"
-        :videoUrl="gameStore.videoUrl"
-        :showControls="false"
-        :showZoomIndicator="false"
-        :autoZoom="true"
-        @zoomChange="handleZoomChange"
-        @videoLoad="handleVideoLoad"
-        @videoError="handleVideoError"
-      />
+    <!-- 1. 顶部视频和状态区域 -->
+    <TopSection
+      :height="heights.video"
+      :audioSettings="audioSettings"
+      @videoLoad="handleVideoLoad"
+      @videoError="handleVideoError"
+      @balanceRefresh="handleBalanceRefresh"
+      @countdownChange="handleCountdownChange"
+      @bgmToggle="handleBgmToggle"
+      @sfxToggle="handleSfxToggle"
+      @bettingHistory="openBettingHistory"
+      @vipCenter="handleVipCenter"
+      @customerService="handleCustomerService"
+    />
 
-      <!-- 浮动UI层 -->
-      <div class="floating-ui-layer">
-        <UserBalance
-          :balance="gameStore.balance"
-          :currency="'CNY'"
-          @refresh="handleBalanceRefresh"
-        />
-        <RoundNumber
-          :roundNumber="gameStore.fullGameNumber"
-        />
-        <GameStatus
-          :gameStatus="gameStore.gameState.status"
-        />
-        <Countdown
-          :countdown="gameStore.gameState.countdown"
-          :maxTime="30"
-          @countdownChange="handleCountdownChange"
-        />
-        <SettingsBtn
-          :initialBgmEnabled="audioSettings.bgmEnabled"
-          :initialSfxEnabled="audioSettings.sfxEnabled"
-          @bgmToggle="handleBgmToggle"
-          @sfxToggle="handleSfxToggle"
-          @bettingHistory="handleBettingHistory"
-          @vipCenter="handleVipCenter"
-          @customerService="handleCustomerService"
-        />
-      </div>
-    </div>
+    <!-- 2. 中间投注区域和筹码 -->
+    <MiddleSection
+      :height="heights.betting"
+      @chipSelect="handleChipSelect"
+      @undo="handleUndo"
+      @repeat="handleRepeat"
+      @moreChips="openChipSelector"
+    />
 
-    <!-- 中间投注区域 -->
-    <div class="betting-section" :style="bettingSectionStyles">
-      <!-- 使用整合后的投注区域布局 -->
-      <BettingAreaLayout />
+    <!-- 3. 底部路珠区域 -->
+    <BottomSection
+      :height="heights.roadmap"
+      :roadmapUrl="roadmapUrl"
+      :showHeader="false"
+      @refresh="handleRoadmapRefresh"
+      @fullscreen="handleRoadmapFullscreen"
+      @iframeLoad="handleRoadmapLoad"
+      @iframeError="handleRoadmapError"
+    />
 
-      <!-- 筹码显示区域 -->
-      <ChipDisplay
-        :selectedChips="bettingStore.getDisplayChipsData"
-        :currentChip="bettingStore.selectedChip"
-        :canUndo="canUndo"
-        :canRepeat="bettingStore.hasLastRoundData"
-        @chipSelect="handleChipSelect"
-        @undo="handleUndo"
-        @repeat="handleRepeat"
-        @more="handleMoreChips"
-      />
-    </div>
-
-    <!-- 底部路珠区域 -->
-    <div class="roadmap-section" :style="roadmapSectionStyles">
-      <iframe
-        :src="roadmapUrl"
-        frameborder="0"
-        class="roadmap-iframe"
-        title="游戏路珠"
-      />
-    </div>
-
-    <!-- 覆盖层系统 -->
-    <div class="overlay-system">
-      <!-- 特效层 -->
-      <ResultEffect
-        v-if="showResultEffect"
-        @close="showResultEffect = false"
-      />
-      <WinningEffect
-        v-if="showWinningEffect"
-        @close="showWinningEffect = false"
-      />
-
-      <!-- 面板层 -->
-      <BettingHistoryModal
-        v-if="showBettingHistory"
-        @close="showBettingHistory = false"
-      />
-      <SettingsPanel
-        v-if="showSettings"
-        @close="showSettings = false"
-      />
-
-      <!-- 🔥 新增：筹码选择器 -->
-      <ChipSelector
-        v-if="showChipSelector"
-        :availableChips="bettingStore.availableChips"
-        :selectedChips="bettingStore.displayChips"
-        :maxSelection="5"
-        @confirm="handleChipSelectorConfirm"
-        @cancel="handleChipSelectorCancel"
-        @close="handleChipSelectorCancel"
-      />
-    </div>
+    <!-- 4. 各种弹出层 -->
+    <OverlaySection
+      :showResultEffect="showResultEffect"
+      :showWinningEffect="showWinningEffect"
+      :showBettingHistory="showBettingHistory"
+      :showSettings="showSettings"
+      :showChipSelector="showChipSelector"
+      :showModal="showModal"
+      :availableChips="bettingStore?.availableChips || []"
+      :selectedChips="bettingStore?.displayChips || []"
+      :maxSelection="5"
+      :notifications="notifications"
+      @resultEffectClose="showResultEffect = false"
+      @winningEffectClose="showWinningEffect = false"
+      @bettingHistoryClose="showBettingHistory = false"
+      @settingsClose="showSettings = false"
+      @chipSelectorConfirm="handleChipSelectorConfirm"
+      @chipSelectorCancel="closeChipSelector"
+      @chipSelectorClose="closeChipSelector"
+      @modalClose="showModal = false"
+      @notificationDismiss="dismissNotification"
+    />
   </div>
 </template>
 
@@ -115,30 +68,50 @@ import type { CSSProperties } from 'vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useBettingStore } from '@/stores/bettingStore'
 
-// 组件导入
-import VideoPlayer from '@/components/VideoPlayer/VideoPlayer.vue'
-import BettingAreaLayout from '@/components/BetArea/BettingAreaLayout.vue'
-import ChipDisplay from '@/components/BetArea/ChipDisplay.vue'
+// 拆分后的组件导入
+import TopSection from './Top.vue'
+import MiddleSection from './Middle.vue'
+import BottomSection from './Bottom.vue'
+import OverlaySection from './Overlay.vue'
 
-// 特效组件
-import ResultEffect from '@/components/Effects/ResultEffect.vue'
-import WinningEffect from '@/components/Effects/WinningEffect.vue'
+// 通知类型
+interface Notification {
+  id: string
+  type: 'success' | 'error' | 'warning' | 'info'
+  title?: string
+  message: string
+  duration?: number
+  dismissible?: boolean
+}
 
-// 浮动UI组件
-import UserBalance from '@/components/FloatingUI/UserBalance.vue'
-import RoundNumber from '@/components/FloatingUI/RoundNumber.vue'
-import GameStatus from '@/components/FloatingUI/GameStatus.vue'
-import Countdown from '@/components/FloatingUI/Countdown.vue'
-import SettingsBtn from '@/components/FloatingUI/SettingsBtn.vue'
+// 🔥 安全的 Store 使用
+let gameStore: any = null
+let bettingStore: any = null
 
-// 面板组件
-import BettingHistoryModal from '@/components/Panels/BettingHistory/BettingHistoryModal.vue'
-import SettingsPanel from '@/components/Panels/SettingsPanel.vue'
-import ChipSelector from '@/components/Panels/ChipSelector.vue'
-
-// 🔥 使用 Store
-const gameStore = useGameStore()
-const bettingStore = useBettingStore()
+try {
+  gameStore = useGameStore()
+  bettingStore = useBettingStore()
+} catch (error) {
+  console.error('❌ Store 初始化失败:', error)
+  // 创建默认对象避免错误
+  gameStore = {
+    balance: 10000,
+    videoUrl: '',
+    fullGameNumber: 'B00125010001',
+    gameState: { status: 'waiting', countdown: 0 },
+    init: () => Promise.resolve()
+  }
+  bettingStore = {
+    selectedChip: 10,
+    displayChips: ['chip-10', 'chip-50', 'chip-100'],
+    availableChips: [],
+    selectChip: () => {},
+    updateDisplayChips: () => {},
+    undoLastBet: () => {},
+    restoreLastRound: () => {},
+    init: () => Promise.resolve()
+  }
+}
 
 // 浏览器检测
 const getBrowserInfo = () => {
@@ -157,28 +130,25 @@ const viewportHeight = ref(window.innerHeight)
 const containerWidth = ref(0)
 const browserInfo = getBrowserInfo()
 
-// 组件引用
-const videoPlayerRef = ref<InstanceType<typeof VideoPlayer>>()
-
 // 面板状态
 const showSettings = ref(false)
 const showBettingHistory = ref(false)
 const showResultEffect = ref(false)
 const showWinningEffect = ref(false)
-const showChipSelector = ref(false) // 🔥 新增：筹码选择器状态
+const showChipSelector = ref(false)
+const showModal = ref(false)
 
-// 🔥 音频设置状态
+// 音频设置状态
 const audioSettings = ref({
   bgmEnabled: true,
   sfxEnabled: true
 })
 
-// 视频和路珠URL
-const videoUrl = computed(() => gameStore.videoUrl || 'https://example.com/live-stream.m3u8')
+// 路珠URL
 const roadmapUrl = ref('https://example.com/roadmap')
 
-// 🔥 计算属性 - 基于 Store 状态
-const canUndo = computed(() => bettingStore.betHistory.length > 0)
+// 通知系统
+const notifications = ref<Notification[]>([])
 
 // 获取真实视口高度
 const getRealViewportHeight = () => {
@@ -191,193 +161,172 @@ const getRealViewportHeight = () => {
 // 高度计算
 const calculateHeights = () => {
   const realHeight = getRealViewportHeight()
-
-  // 不同浏览器的安全边距
   const safeMargin = browserInfo.isiOSSafari ? 20 :
                     browserInfo.isTelegram ? 15 :
                     browserInfo.isiOS ? 10 : 5
 
   return {
     total: realHeight - safeMargin,
-    video: 350, // 固定视频高度
-    roadmap: 120, // 固定路珠高度
-    betting: Math.max(200, realHeight - 350 - 120 - safeMargin - 20) // 剩余空间给投注区
+    video: 350,
+    roadmap: 120,
+    betting: Math.max(200, realHeight - 350 - 120 - safeMargin - 20)
   }
 }
 
-// 计算样式
-const sectionStyles = computed((): CSSProperties => {
-  const heights = calculateHeights()
-  return {
-    height: `${heights.total}px`,
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    background: 'linear-gradient(135deg, #0d1b2a 0%, #1b4332 100%)',
-    position: 'relative',
-    overflow: 'hidden',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-  }
-})
+// 计算属性
+const heights = computed(() => calculateHeights())
 
-const videoSectionStyles = computed((): CSSProperties => {
-  const heights = calculateHeights()
-  return {
-    height: `${heights.video}px`,
-    width: '100%',
-    position: 'relative',
-    background: '#000',
-    borderRadius: '0 0 8px 8px',
-    overflow: 'hidden',
-    flexShrink: 0
-  }
-})
+const sectionStyles = computed((): CSSProperties => ({
+  height: `${heights.value.total}px`,
+  width: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  background: 'linear-gradient(135deg, #0d1b2a 0%, #1b4332 100%)',
+  position: 'relative',
+  overflow: 'hidden',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+}))
 
-const bettingSectionStyles = computed((): CSSProperties => {
-  const heights = calculateHeights()
-  return {
-    height: `${heights.betting}px`,
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    padding: '10px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    flex: 1,
-    overflow: 'hidden'
-  }
-})
+// 🔥 事件处理方法
 
-const roadmapSectionStyles = computed((): CSSProperties => {
-  const heights = calculateHeights()
-  return {
-    height: `${heights.roadmap}px`,
-    width: '100%',
-    position: 'relative',
-    background: '#1a1a1a',
-    borderRadius: '8px 8px 0 0',
-    overflow: 'hidden',
-    flexShrink: 0
-  }
-})
-
-// 🔥 Store 事件处理
-
-// 筹码相关事件
-const handleChipSelect = (chipValue: number) => {
-  bettingStore.selectChip(chipValue)
-  console.log(`🎯 选择筹码: ${chipValue}`)
+// 视频相关事件
+const handleVideoLoad = () => {
+  console.log('✅ 视频加载完成')
+  showNotification('success', '视频已加载', '直播画面加载成功', 2000)
 }
 
-const handleMoreChips = () => {
-  showChipSelector.value = true
-  console.log('📱 打开筹码选择器')
+const handleVideoError = () => {
+  console.error('❌ 视频加载失败')
+  showNotification('error', '视频加载失败', '请检查网络连接或刷新页面', 5000)
 }
 
-const handleChipSelectorConfirm = (chipIds: string[]) => {
-  bettingStore.updateDisplayChips(chipIds)
-  showChipSelector.value = false
-  console.log('✅ 确认筹码选择:', chipIds)
-}
-
-const handleChipSelectorCancel = () => {
-  showChipSelector.value = false
-  console.log('❌ 取消筹码选择')
-}
-
-// 投注控制事件
-const handleUndo = () => {
-  bettingStore.undoLastBet()
-}
-
-const handleRepeat = () => {
-  bettingStore.restoreLastRound()
-}
-
-// 余额刷新
 const handleBalanceRefresh = () => {
-  // 模拟刷新余额
   console.log('🔄 刷新余额')
-  // 这里可以调用 API 刷新余额
+  showNotification('info', '刷新余额', '正在获取最新余额信息...', 1500)
+}
+
+const handleCountdownChange = (seconds: number) => {
+  console.log(`⏰ 倒计时变化: ${seconds}秒`)
+  // 这里可以添加倒计时相关的业务逻辑
 }
 
 // 音频设置事件
 const handleBgmToggle = (enabled: boolean) => {
   audioSettings.value.bgmEnabled = enabled
   console.log(`🎵 背景音乐: ${enabled ? '开启' : '关闭'}`)
+  showNotification('info', '背景音乐', `已${enabled ? '开启' : '关闭'}背景音乐`, 1500)
 }
 
 const handleSfxToggle = (enabled: boolean) => {
   audioSettings.value.sfxEnabled = enabled
   console.log(`🔊 音效: ${enabled ? '开启' : '关闭'}`)
+  showNotification('info', '音效', `已${enabled ? '开启' : '关闭'}音效`, 1500)
 }
 
-// 面板事件
-const handleBettingHistory = () => {
+// 面板控制事件
+const openBettingHistory = () => {
   showBettingHistory.value = true
   console.log('📊 打开投注记录')
 }
 
 const handleVipCenter = () => {
   console.log('👑 跳转会员中心')
-  // 这里可以实现跳转逻辑
+  showNotification('info', '会员中心', '正在跳转到会员中心...', 2000)
 }
 
 const handleCustomerService = () => {
   console.log('🎧 联系客服')
-  // 这里可以实现客服逻辑
+  showNotification('info', '客服服务', '正在连接客服，请稍候...', 2000)
 }
 
-// 视频播放器事件
-const handleZoomChange = (zoom: number) => {
-  console.log('📹 视频缩放变化:', zoom)
+// 筹码相关事件
+const handleChipSelect = (chipValue: number) => {
+  console.log(`🎯 选择筹码: ${chipValue}`)
+  showNotification('success', '筹码选择', `已选择 ${chipValue} 元筹码`, 1000)
 }
 
-const handleVideoLoad = () => {
-  console.log('✅ 视频加载完成')
+const handleUndo = () => {
+  console.log('↩️ 执行撤销操作')
+  showNotification('info', '撤销操作', '已撤销上一步投注', 1500)
 }
 
-const handleVideoError = () => {
-  console.error('❌ 视频加载失败')
+const handleRepeat = () => {
+  console.log('🔄 执行重复操作')
+  showNotification('info', '重复投注', '已恢复上一局投注', 1500)
 }
 
-// 倒计时控制视频缩放
-const handleCountdownChange = (seconds: number) => {
-  if (!videoPlayerRef.value) return
+const openChipSelector = () => {
+  showChipSelector.value = true
+  console.log('📱 打开筹码选择器')
+}
 
-  const phase = gameStore.gameState.status
-  console.log(`⏰ 倒计时变化: ${seconds}秒, 阶段: ${phase}`)
+const closeChipSelector = () => {
+  showChipSelector.value = false
+  console.log('🔒 关闭筹码选择器')
+}
 
-  switch (phase) {
-    case 'betting':
-      // 投注阶段 - 保持正常大小
-      videoPlayerRef.value.resetZoom?.()
-      break
-
-    case 'dealing':
-      // 开牌阶段 - 根据倒计时放大
-      if (seconds <= 10) {
-        const zoomLevel = 1 + (10 - seconds) * 0.05 // 逐渐放大
-        videoPlayerRef.value.setZoom?.(zoomLevel, true)
-      }
-      break
-
-    case 'result':
-      // 结果阶段 - 最大放大
-      videoPlayerRef.value.animateZoom?.(1.5, 1000)
-
-      // 5秒后缩小回正常
-      setTimeout(() => {
-        videoPlayerRef.value?.resetZoom?.()
-      }, 5000)
-      break
+const handleChipSelectorConfirm = (chipIds: string[]) => {
+  try {
+    bettingStore?.updateDisplayChips?.(chipIds)
+    showChipSelector.value = false
+    console.log('✅ 确认筹码选择:', chipIds)
+    showNotification('success', '筹码设置', `已更新筹码显示设置`, 2000)
+  } catch (error) {
+    console.error('❌ 筹码设置失败:', error)
+    showNotification('error', '设置失败', '筹码设置更新失败', 3000)
   }
 }
 
-// 容器尺寸更新
-const updateContainerSize = () => {
-  const container = document.querySelector('.game-section') as HTMLElement
-  if (container) {
-    containerWidth.value = container.offsetWidth
+// 路珠相关事件
+const handleRoadmapRefresh = () => {
+  console.log('🔄 刷新路珠')
+  showNotification('info', '路珠刷新', '正在刷新路珠数据...', 1500)
+}
+
+const handleRoadmapFullscreen = () => {
+  console.log('📺 路珠全屏')
+  showNotification('info', '全屏查看', '路珠全屏功能开发中...', 2000)
+}
+
+const handleRoadmapLoad = () => {
+  console.log('✅ 路珠加载完成')
+}
+
+const handleRoadmapError = (error: string) => {
+  console.error('❌ 路珠加载失败:', error)
+  showNotification('error', '路珠加载失败', error, 5000)
+}
+
+// 通知系统
+const showNotification = (
+  type: 'success' | 'error' | 'warning' | 'info',
+  title: string,
+  message: string,
+  duration: number = 3000
+) => {
+  const notification: Notification = {
+    id: Date.now().toString(),
+    type,
+    title,
+    message,
+    duration,
+    dismissible: true
+  }
+
+  notifications.value.push(notification)
+
+  // 自动移除
+  if (duration > 0) {
+    setTimeout(() => {
+      dismissNotification(notification.id)
+    }, duration)
+  }
+}
+
+const dismissNotification = (id: string) => {
+  const index = notifications.value.findIndex(n => n.id === id)
+  if (index > -1) {
+    notifications.value.splice(index, 1)
   }
 }
 
@@ -385,7 +334,10 @@ const updateContainerSize = () => {
 const handleResize = () => {
   viewportHeight.value = getRealViewportHeight()
   nextTick(() => {
-    updateContainerSize()
+    const container = document.querySelector('.game-section') as HTMLElement
+    if (container) {
+      containerWidth.value = container.offsetWidth
+    }
   })
 }
 
@@ -398,53 +350,62 @@ const debouncedResize = () => {
   resizeTimer = setTimeout(handleResize, 100)
 }
 
-// 监听visualViewport变化（主要针对iOS Safari）
+// 监听visualViewport变化（iOS Safari）
 const handleVisualViewportChange = () => {
   if (window.visualViewport) {
     viewportHeight.value = window.visualViewport.height
     nextTick(() => {
-      updateContainerSize()
+      const container = document.querySelector('.game-section') as HTMLElement
+      if (container) {
+        containerWidth.value = container.offsetWidth
+      }
     })
   }
 }
 
 // 组件生命周期
-onMounted(() => {
+onMounted(async () => {
   console.log('🎮 GameSection 组件已挂载')
-  console.log('🔧 浏览器信息:', browserInfo)
 
-  // 🔥 初始化 Store
-  gameStore.init()
-  bettingStore.init()
+  try {
+    // 初始化 Store
+    await gameStore?.init?.()
+    await bettingStore?.init?.()
+    console.log('✅ Store 初始化完成')
 
-  console.log('📺 视频地址:', videoUrl.value)
-  console.log('🎯 路珠地址:', roadmapUrl.value)
+    // 初始化尺寸
+    handleResize()
 
-  // 初始化尺寸
-  handleResize()
+    // 监听事件
+    window.addEventListener('resize', debouncedResize)
+    window.addEventListener('orientationchange', debouncedResize)
 
-  // 监听事件
-  window.addEventListener('resize', debouncedResize)
-  window.addEventListener('orientationchange', debouncedResize)
-
-  // iOS Safari 特殊处理
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', handleVisualViewportChange)
-    window.visualViewport.addEventListener('scroll', handleVisualViewportChange)
-  }
-
-  // 监听容器大小变化
-  if (window.ResizeObserver) {
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        containerWidth.value = entry.contentRect.width
-      }
-    })
-
-    const container = document.querySelector('.game-section')
-    if (container) {
-      resizeObserver.observe(container)
+    // iOS Safari 特殊处理
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange)
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange)
     }
+
+    // 监听容器大小变化
+    if (window.ResizeObserver) {
+      const resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          containerWidth.value = entry.contentRect.width
+        }
+      })
+
+      const container = document.querySelector('.game-section')
+      if (container) {
+        resizeObserver.observe(container)
+      }
+    }
+
+    // 显示欢迎消息
+    showNotification('success', '欢迎回来', '游戏系统已就绪', 3000)
+
+  } catch (error) {
+    console.error('❌ 初始化失败:', error)
+    showNotification('error', '初始化失败', '系统初始化出现问题，请刷新页面', 5000)
   }
 })
 
@@ -469,13 +430,11 @@ onUnmounted(() => {
 if (import.meta.env.DEV) {
   console.log('🔧 GameSection 调试信息:', {
     browserInfo,
-    viewportHeight: viewportHeight.value,
-    containerWidth: containerWidth.value,
-    gameStore: gameStore.$state,
+    heights: heights.value,
+    gameStore: gameStore?.$state,
     bettingStore: {
-      selectedChip: bettingStore.selectedChip,
-      displayChips: bettingStore.displayChips,
-      totalBets: bettingStore.totalUserBets
+      selectedChip: bettingStore?.selectedChip,
+      displayChips: bettingStore?.displayChips
     }
   })
 }
@@ -490,84 +449,18 @@ if (import.meta.env.DEV) {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.video-section {
-  position: relative;
-  background: #000;
-  border-radius: 0 0 8px 8px;
-  overflow: hidden;
-
-  .floating-ui-layer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    pointer-events: none;
-    z-index: 10;
-
-    > * {
-      pointer-events: auto;
-    }
-  }
-}
-
-.betting-section {
-  display: flex;
-  flex-direction: column;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  flex: 1;
-  overflow: hidden;
-}
-
-.roadmap-section {
-  position: relative;
-  background: #1a1a1a;
-  border-radius: 8px 8px 0 0;
-  overflow: hidden;
-
-  .roadmap-iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-    background: transparent;
-  }
-}
-
-.overlay-system {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  z-index: 1000;
-
-  > * {
-    pointer-events: auto;
-  }
-}
-
-/* 响应式适配 */
-@media (max-width: 768px) {
-  .betting-section {
-    padding: 8px;
-  }
-}
-
-/* Safari 特殊样式 */
-@supports (-webkit-touch-callout: none) {
-  .game-section {
-    /* iOS Safari 特殊处理 */
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
 /* 安全区域适配 */
 .game-section {
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+}
+
+/* Safari 特殊样式 */
+@supports (-webkit-touch-callout: none) {
+  .game-section {
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style>

@@ -100,12 +100,18 @@ const autoConfirmBets = async () => {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .main-betting-zones {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1;
+  height: 100%;
+  justify-content: space-between;
 }
 
 .betting-row {
@@ -114,26 +120,34 @@ const autoConfirmBets = async () => {
   align-items: stretch;
   justify-content: center;
   width: 100%;
+  flex: 1;
 }
 
 /* 第一排：边注区域 - 横向占满 */
 .first-row {
   margin-bottom: 8px;
+  flex: 0.6;
 }
 
 .first-row .zone-item {
   flex: 1;
   min-width: 0;
   max-width: none;
-  height: 50px;
+  height: 100%;
+  min-height: 50px;
 }
 
 /* 第二排：主要投注区域 - 横向占满 */
+.second-row {
+  flex: 1;
+}
+
 .second-row .zone-item {
   flex: 1;
   min-width: 0;
   max-width: none;
-  height: 80px;
+  height: 100%;
+  min-height: 80px;
 }
 
 /* 状态提示框 */
@@ -187,12 +201,12 @@ const autoConfirmBets = async () => {
   }
 
   .first-row .zone-item {
-    height: 45px;
+    min-height: 45px;
     font-size: 10px;
   }
 
   .second-row .zone-item {
-    height: 70px;
+    min-height: 70px;
     font-size: 14px;
   }
 }
@@ -203,12 +217,12 @@ const autoConfirmBets = async () => {
   }
 
   .first-row .zone-item {
-    height: 40px;
+    min-height: 40px;
     font-size: 9px;
   }
 
   .second-row .zone-item {
-    height: 65px;
+    min-height: 65px;
     font-size: 13px;
   }
 }

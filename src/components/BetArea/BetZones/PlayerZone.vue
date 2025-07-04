@@ -4,8 +4,7 @@
     :class="{
       'active': hasActiveBet,
       'winning': isWinning,
-      'losing': isLosing,
-      'can-bet': canPlaceBet
+      'losing': isLosing
     }"
     @click="handleBetClick"
   >
@@ -22,14 +21,15 @@
         </div>
       </div>
 
-      <!-- 其他用户信息 -->
+      <!-- 其他用户信息 - 简化显示 -->
       <div class="other-users-info">
         <div class="user-count">
           <span class="count-icon">👥</span>
-          {{ displayData.otherPlayerCount }}人
+          {{ displayData.otherPlayerCount }}
         </div>
         <div class="total-amount">
-          总投注: ${{ formatAmount(displayData.otherTotalAmount) }}
+          <span class="money-icon">💰</span>
+          ${{ formatAmount(displayData.otherTotalAmount) }}
         </div>
       </div>
     </div>
@@ -66,10 +66,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
-import { useGameStore } from '@/stores/gameStore'
 
 const bettingStore = useBettingStore()
-const gameStore = useGameStore()
 
 // 投注区域ID
 const ZONE_ID = 'player'
@@ -86,46 +84,19 @@ const hasActiveBet = computed(() => {
   return (bettingStore.currentBets[ZONE_ID] || 0) > 0
 })
 
-const canPlaceBet = computed(() => {
-  return gameStore.canBet || gameStore.gameState?.status === 'betting'
-})
-
-// 获取显示数据（包含用户投注、其他用户数据、筹码图片）
+// 获取显示数据（包含用户投注、其他用户数据、筹码图片）- 使用公共方法
 const displayData = computed(() => {
   return bettingStore.getBetZoneDisplayData(ZONE_ID)
 })
 
 // 方法
 const handleBetClick = () => {
-  // 检查是否可以投注
-  if (!canPlaceBet.value) {
-    const gameStatus = gameStore.gameState?.status
-    let message = ''
-
-    switch (gameStatus) {
-      case 'dealing':
-        message = '开牌中，暂停投注'
-        break
-      case 'result':
-        message = '结果公布中，暂停投注'
-        break
-      case 'waiting':
-        message = '等待新局开始'
-        break
-      default:
-        message = '当前不可投注'
-    }
-
-    showStatusMessage(message)
-    return
-  }
-
-  // 执行投注（使用 bettingStore 统一处理）
+  // 无任何限制，直接执行投注
   const result = bettingStore.placeBet(ZONE_ID, bettingStore.selectedChip)
 
   if (result.success) {
     console.log('闲投注成功:', result.amount)
-    showStatusMessage(result.message)
+    showStatusMessage(result.message, 'success')
 
     // 触觉反馈
     if (navigator.vibrate) {
@@ -136,7 +107,7 @@ const handleBetClick = () => {
     animateClick()
   } else {
     console.log('闲投注失败:', result.message)
-    showStatusMessage(result.message)
+    showStatusMessage(result.message, 'error')
   }
 }
 
@@ -150,11 +121,12 @@ const animateClick = () => {
   }
 }
 
+// 使用公共格式化方法
 const formatAmount = (amount: number | undefined | null): string => {
   return bettingStore.formatAmount(amount)
 }
 
-const showStatusMessage = (message: string) => {
+const showStatusMessage = (message: string, type: 'success' | 'error' = 'success') => {
   statusMessage.value = message
   setTimeout(() => {
     statusMessage.value = ''
@@ -181,7 +153,7 @@ const showLoseAnimation = () => {
 </script>
 
 <style scoped>
-/* 第二排主要投注区域样式 */
+/* 第二排主要投注区域样式 - 蓝色 */
 .second-row-zone {
   position: relative;
   background: linear-gradient(135deg, #1f4e79 0%, #2980b9 100%);
@@ -196,6 +168,7 @@ const showLoseAnimation = () => {
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   font-size: 14px;
+  height: 100%;
 }
 
 .second-row-zone:hover {
@@ -293,7 +266,14 @@ const showLoseAnimation = () => {
 }
 
 .total-amount {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-weight: 600;
+}
+
+.money-icon {
+  font-size: 12px;
 }
 
 .chips-container {

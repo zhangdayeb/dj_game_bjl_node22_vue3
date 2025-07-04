@@ -4,8 +4,7 @@
     :class="{
       'active': hasActiveBet,
       'winning': isWinning,
-      'losing': isLosing,
-      'can-bet': canPlaceBet
+      'losing': isLosing
     }"
     @click="handleBetClick"
   >
@@ -20,6 +19,23 @@
       </div>
       <div class="no-bet-placeholder" v-else>
         -
+      </div>
+    </div>
+
+    <!-- 投注筹码显示 -->
+    <div class="chips-container" v-if="betAmount > 0">
+      <div class="chip-stack">
+        <img
+          v-for="(chip, index) in chipImages"
+          :key="index"
+          :src="chip.image"
+          :alt="`${chip.value}元筹码`"
+          class="chip-image"
+          :style="{
+            zIndex: index + 1,
+            transform: `translateY(-${index * 2}px) translateX(${index * 1}px)`
+          }"
+        />
       </div>
     </div>
 
@@ -38,10 +54,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
-import { useGameStore } from '@/stores/gameStore'
 
 const bettingStore = useBettingStore()
-const gameStore = useGameStore()
 
 // 投注区域ID
 const ZONE_ID = 'lucky-6'
@@ -62,45 +76,19 @@ const hasActiveBet = computed(() => {
   return betAmount.value > 0
 })
 
-const canPlaceBet = computed(() => {
-  return gameStore.canBet || gameStore.gameState?.status === 'betting'
+// 获取筹码图片 - 使用公共方法
+const chipImages = computed(() => {
+  return bettingStore.getChipImages(betAmount.value)
 })
 
 // 方法
 const handleBetClick = () => {
-  // 检查是否可以投注
-  if (!canPlaceBet.value) {
-    const gameStatus = gameStore.gameState?.status
-    let message = ''
+  // 无任何限制，直接执行投注
+  const result = bettingStore.placeBet(ZONE_ID, bettingStore.selectedChip)
 
-    switch (gameStatus) {
-      case 'dealing':
-        message = '开牌中，暂停投注'
-        break
-      case 'result':
-        message = '结果公布中，暂停投注'
-        break
-      case 'waiting':
-        message = '等待新局开始'
-        break
-      default:
-        message = '当前不可投注'
-    }
-
-    showStatusMessage(message)
-    return
-  }
-
-  // 检查余额
-  if (bettingStore.balance < bettingStore.selectedChip) {
-    showStatusMessage('余额不足')
-    return
-  }
-
-  // 执行投注
-  const success = bettingStore.placeBet(ZONE_ID, bettingStore.selectedChip)
-  if (success) {
-    console.log('幸运6投注成功:', bettingStore.selectedChip)
+  if (result.success) {
+    console.log('幸运6投注成功:', result.amount)
+    showStatusMessage(result.message, 'success')
 
     // 触觉反馈
     if (navigator.vibrate) {
@@ -110,7 +98,8 @@ const handleBetClick = () => {
     // 点击动画
     animateClick()
   } else {
-    showStatusMessage('投注失败')
+    console.log('幸运6投注失败:', result.message)
+    showStatusMessage(result.message, 'error')
   }
 }
 
@@ -124,14 +113,12 @@ const animateClick = () => {
   }
 }
 
+// 使用公共格式化方法
 const formatAmount = (amount: number | undefined | null): string => {
-  if (amount === undefined || amount === null || isNaN(amount)) {
-    return '0'
-  }
-  return amount.toLocaleString()
+  return bettingStore.formatAmount(amount)
 }
 
-const showStatusMessage = (message: string) => {
+const showStatusMessage = (message: string, type: 'success' | 'error' = 'success') => {
   statusMessage.value = message
   setTimeout(() => {
     statusMessage.value = ''
@@ -158,7 +145,7 @@ const showLoseAnimation = () => {
 </script>
 
 <style scoped>
-/* 第一排边注区域样式 */
+/* 第一排边注区域样式 - 紫色 */
 .first-row-zone {
   position: relative;
   background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
@@ -173,6 +160,7 @@ const showLoseAnimation = () => {
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   font-size: 12px;
+  height: 100%;
 }
 
 .first-row-zone:hover {
@@ -249,6 +237,29 @@ const showLoseAnimation = () => {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.5);
   font-weight: 300;
+}
+
+.chips-container {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  pointer-events: none;
+}
+
+.chip-stack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: -2px;
+}
+
+.chip-image {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
 }
 
 .win-effect {
@@ -341,6 +352,11 @@ const showLoseAnimation = () => {
   .bet-amount {
     font-size: 10px;
   }
+
+  .chip-image {
+    width: 14px;
+    height: 14px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -359,6 +375,11 @@ const showLoseAnimation = () => {
 
   .bet-amount {
     font-size: 9px;
+  }
+
+  .chip-image {
+    width: 12px;
+    height: 12px;
   }
 }
 </style>

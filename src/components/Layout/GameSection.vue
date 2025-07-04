@@ -168,29 +168,28 @@ const connectionStatusText = computed(() => {
   return '连接中'
 })
 
-// 获取真实视口高度
+// 🔥 修复：获取真实视口高度
 const getRealViewportHeight = () => {
   if (window.visualViewport) {
     return window.visualViewport.height
   }
-  return window.innerHeight || document.documentElement.clientHeight
+  return window.innerHeight || document.documentElement.clientHeight || screen.height
 }
 
-// 高度计算
+// 🔥 修复：简化高度计算，避免空白区域
 const calculateHeights = () => {
   const realHeight = getRealViewportHeight()
-  const safeMargin = browserInfo.isiOSSafari ? 20 :
-                    browserInfo.isTelegram ? 15 :
-                    browserInfo.isiOS ? 10 : 5
+
+  // 🔥 不再减去多余的边距，让内容填满整个屏幕
+  const totalHeight = realHeight
 
   // 计算各区域高度
   const videoHeight = 350
   const roadmapHeight = Math.round(containerWidth.value * 0.35) // 路珠高度 = 宽度 * 0.35
-  const availableHeight = realHeight - safeMargin - 20 // 留出间距
-  const bettingHeight = Math.max(200, availableHeight - videoHeight - roadmapHeight)
+  const bettingHeight = Math.max(200, totalHeight - videoHeight - roadmapHeight)
 
   return {
-    total: availableHeight,
+    total: totalHeight,
     video: videoHeight,
     roadmap: roadmapHeight,
     betting: bettingHeight
@@ -200,8 +199,10 @@ const calculateHeights = () => {
 // 计算属性
 const heights = computed(() => calculateHeights())
 
+// 🔥 修复：容器样式，确保填满整个屏幕
 const sectionStyles = computed((): CSSProperties => ({
   height: `${heights.value.total}px`,
+  minHeight: '100vh', // 🔥 新增：确保至少填满整个视口
   width: '100%',
   display: 'flex',
   flexDirection: 'column',
@@ -308,7 +309,7 @@ const setupDataWatchers = () => {
   })
 }
 
-// 🔥 简化的窗口大小变化处理
+// 🔥 修复：窗口大小变化处理
 const handleResize = () => {
   viewportHeight.value = getRealViewportHeight()
 
@@ -317,6 +318,13 @@ const handleResize = () => {
     if (container) {
       containerWidth.value = container.offsetWidth
     }
+  })
+
+  // 🔥 调试信息
+  console.log('📐 屏幕尺寸更新:', {
+    viewportHeight: viewportHeight.value,
+    containerWidth: containerWidth.value,
+    totalHeight: heights.value.total
   })
 }
 
@@ -398,21 +406,32 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 🔥 修复：容器样式，确保完全填满屏幕 */
 .game-section {
   width: 100%;
+  min-height: 100vh; /* 🔥 确保最小高度为视口高度 */
   background: linear-gradient(135deg, #0d1b2a 0%, #1b4332 100%);
   position: relative;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* 🔥 移除了之前的 padding，避免重复计算 */
+  margin: 0;
+  padding: 0;
+
+  /* 🔥 确保在各种设备上都能正确显示 */
+  box-sizing: border-box;
 }
 
-/* 🔥 初始化遮罩 */
+/* 🔥 初始化遮罩 - 确保完全覆盖 */
 .initialization-overlay {
-  position: absolute;
+  position: fixed; /* 🔥 改为 fixed，确保覆盖整个屏幕 */
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background: linear-gradient(135deg, #0d1b2a 0%, #1b4332 100%);
   display: flex;
   align-items: center;
@@ -426,6 +445,7 @@ onUnmounted(() => {
   padding: 40px 20px;
   max-width: 400px;
   width: 100%;
+  position: relative;
 }
 
 /* 🔥 加载状态 */
@@ -479,7 +499,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 300px;
+  min-height: 60vh; /* 🔥 调整最小高度 */
 }
 
 .welcome-content {
@@ -528,7 +548,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 300px;
+  min-height: 60vh; /* 🔥 调整最小高度 */
 }
 
 .error-content {
@@ -577,15 +597,11 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
+  /* 🔥 确保游戏主界面也能完全填满 */
+  min-height: inherit;
 }
 
-/* 安全区域适配 */
-.game-section {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-}
+/* 🔥 移除了之前的安全区域 padding，因为会造成空白 */
 
 /* Safari 特殊样式 */
 @supports (-webkit-touch-callout: none) {
@@ -633,5 +649,36 @@ onUnmounted(() => {
     font-size: 24px;
     margin-bottom: 20px;
   }
+
+  .welcome-section,
+  .error-section {
+    min-height: 50vh; /* 🔥 横屏时调整高度 */
+  }
+}
+
+/* 🔥 针对不同设备的特殊处理 */
+@media screen and (max-height: 667px) {
+  /* iPhone SE/8 等小屏设备 */
+  .welcome-section,
+  .error-section {
+    min-height: 50vh;
+  }
+
+  .init-container {
+    padding: 20px 15px;
+  }
+}
+
+/* 🔥 确保在所有情况下都没有底部空白 */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  height: 100vh;
+  overflow: hidden;
 }
 </style>

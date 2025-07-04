@@ -1,11 +1,11 @@
-<!-- src/components/FloatingUI/GameStatus.vue -->
+<!-- src/components/FloatingUI/GameStatus.vue - 修复版 -->
 <template>
-  <div v-show="showStatus" class="game-status">
+  <div v-show="shouldShow" class="game-status">
     <div class="status-container">
       <div class="status-icon">
         <div class="pulse-dot" :class="statusClass"></div>
       </div>
-      <span class="status-text">{{ statusText }}</span>
+      <span class="status-text">{{ displayStatusText }}</span>
     </div>
   </div>
 </template>
@@ -16,34 +16,53 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 // Props
 interface Props {
   gameStatus: 'waiting' | 'betting' | 'dealing' | 'result'
+  alwaysShow?: boolean  // 🔥 新增：是否始终显示
+  debugMode?: boolean   // 🔥 新增：调试模式
+  autoHide?: boolean    // 🔥 新增：是否自动隐藏
+  hideDelay?: number    // 🔥 新增：自动隐藏延迟时间（秒）
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  gameStatus: 'waiting'
+  gameStatus: 'waiting',
+  alwaysShow: false,    // 🔥 默认不强制显示
+  debugMode: false,     // 🔥 默认不开启调试模式
+  autoHide: true,       // 🔥 默认开启自动隐藏
+  hideDelay: 5          // 🔥 默认5秒后隐藏
 })
 
 // 响应式数据
 const showStatus = ref(false)
 const hideTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
-// 计算属性
-const statusText = computed(() => {
-  switch (props.gameStatus) {
-    case 'betting':
-      return '投注中'
-    case 'dealing':
-      return '开牌中'
-    case 'result':
-      return '结算中'
-    case 'waiting':
-      return '等待中'
-    default:
-      return '等待中'
+// 🔥 计算属性：显示的状态文本
+const displayStatusText = computed(() => {
+  const statusMap = {
+    betting: '投注中',
+    dealing: '开牌中',
+    result: '结算中',
+    waiting: '等待中'
   }
+
+  // 调试模式下，确保有显示内容
+  if (props.debugMode && !props.gameStatus) {
+    return '调试模式'
+  }
+
+  return statusMap[props.gameStatus] || '等待中'
 })
 
+// 🔥 计算属性：是否应该显示组件
+const shouldShow = computed(() => {
+  if (props.alwaysShow || props.debugMode) {
+    return true  // 强制显示或调试模式下始终显示
+  }
+  return showStatus.value  // 原逻辑：根据状态变化显示
+})
+
+// 🔥 计算属性：状态样式类
 const statusClass = computed(() => {
-  switch (props.gameStatus) {
+  const currentStatus = props.gameStatus || 'waiting'
+  switch (currentStatus) {
     case 'betting':
       return 'betting'
     case 'dealing':
@@ -57,27 +76,69 @@ const statusClass = computed(() => {
   }
 })
 
-// 监听状态变化
-watch(() => props.gameStatus, (newStatus) => {
-  // 清除之前的定时器
+// 🔥 清除定时器函数
+const clearHideTimer = () => {
   if (hideTimer.value) {
     clearTimeout(hideTimer.value)
+    hideTimer.value = null
   }
+}
+
+// 🔥 设置自动隐藏定时器
+const setAutoHide = () => {
+  if (!props.autoHide || props.alwaysShow || props.debugMode) {
+    return  // 不需要自动隐藏
+  }
+
+  clearHideTimer()
+  hideTimer.value = setTimeout(() => {
+    showStatus.value = false
+    if (props.debugMode) {
+      console.log('🔍 游戏状态组件自动隐藏')
+    }
+  }, props.hideDelay * 1000)
+}
+
+// 监听状态变化
+watch(() => props.gameStatus, (newStatus, oldStatus) => {
+  if (props.debugMode) {
+    console.log(`🎮 游戏状态变化: ${oldStatus} → ${newStatus}`)
+  }
+
+  // 如果是强制显示模式，不需要处理显示逻辑
+  if (props.alwaysShow || props.debugMode) {
+    return
+  }
+
+  // 清除之前的定时器
+  clearHideTimer()
 
   // 显示状态
   showStatus.value = true
 
-  // 5秒后隐藏
-  hideTimer.value = setTimeout(() => {
-    showStatus.value = false
-  }, 5000)
+  // 设置自动隐藏
+  setAutoHide()
 }, { immediate: true })
+
+// 🔥 监听显示状态变化（调试用）
+watch(() => shouldShow.value, (newValue) => {
+  if (props.debugMode) {
+    console.log(`🔍 游戏状态组件显示状态: ${newValue}`)
+  }
+})
+
+// 🔥 初始化显示状态
+if (props.alwaysShow || props.debugMode) {
+  showStatus.value = true
+} else {
+  // 正常模式下，立即显示并设置自动隐藏
+  showStatus.value = true
+  setAutoHide()
+}
 
 // 组件卸载时清理定时器
 onUnmounted(() => {
-  if (hideTimer.value) {
-    clearTimeout(hideTimer.value)
-  }
+  clearHideTimer()
 })
 </script>
 
@@ -94,6 +155,8 @@ onUnmounted(() => {
   color: white;
   z-index: 15;
   animation: slideInDown 0.3s ease-out;
+  /* 🔥 确保组件可见性 */
+  display: block !important;
 }
 
 .status-container {

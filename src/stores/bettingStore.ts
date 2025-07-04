@@ -1,4 +1,4 @@
-// src/stores/bettingStore.ts - 修复版：统一筹码管理
+// src/stores/bettingStore.ts - 最终修复版：兼容所有组件
 import { defineStore } from 'pinia'
 import { ref, computed, reactive } from 'vue'
 
@@ -241,7 +241,7 @@ export const DEFAULT_CHIPS = [10, 50, 100] as const
 
 export const useBettingStore = defineStore('betting', () => {
   // 基础状态
-  const selectedChip = ref(10)
+  const selectedChipRef = ref(10)
   const balance = ref(10000)
   const gamePhase = ref<'waiting' | 'betting' | 'dealing' | 'result'>('betting')
   const isCommissionFree = ref(false)
@@ -299,10 +299,10 @@ export const useBettingStore = defineStore('betting', () => {
 
   // 🔥 修改：筹码相关状态 - 直接存储完整的筹码对象
   const displayChips = ref<ChipData[]>([...DEFAULT_DISPLAY_CHIPS])
-  const availableChips = ref(AVAILABLE_CHIPS)
+  const availableChips = ref<ChipData[]>(AVAILABLE_CHIPS)
 
-  // 模拟数据更新定时器
-  const simulationTimers = ref<Record<BaccaratBetType, NodeJS.Timeout | null>>({
+  // 🔥 修复：模拟数据更新定时器 - 使用 number 类型
+  const simulationTimers = ref<Record<BaccaratBetType, number | null>>({
     'banker': null,
     'player': null,
     'tie': null,
@@ -315,6 +315,14 @@ export const useBettingStore = defineStore('betting', () => {
 
   // 🔥 新增：闪烁效果管理
   const blinkingZones = ref<Set<BaccaratBetType>>(new Set())
+
+  // 🔥 关键修复：计算属性 - 避免重复定义
+  const selectedChip = computed({
+    get: () => selectedChipRef.value,
+    set: (value: number) => {
+      selectedChipRef.value = value
+    }
+  })
 
   // 计算属性
   const totalBetAmount = computed(() => {
@@ -407,8 +415,18 @@ export const useBettingStore = defineStore('betting', () => {
       return { success: false, message: '当前不在投注阶段' }
     }
 
+    // 🔥 关键修复：确保使用当前选中的筹码值
+    const actualAmount = typeof amount === 'number' ? amount : selectedChipRef.value
+    console.log(`🎯 投注详情:`, {
+      betType,
+      传入金额: amount,
+      实际使用金额: actualAmount,
+      当前选中筹码: selectedChipRef.value,
+      显示筹码列表: displayChips.value.map(c => c.value)
+    })
+
     // 计算投注金额
-    const result = calculateBetAmount(betType, amount)
+    const result = calculateBetAmount(betType, actualAmount)
     if (!result.success) {
       return result
     }
@@ -503,8 +521,8 @@ export const useBettingStore = defineStore('betting', () => {
       console.warn('⚠️ 未提供有效筹码，使用默认筹码')
       displayChips.value = [...DEFAULT_DISPLAY_CHIPS]
       // 🔥 新增：自动选择第一个默认筹码
-      selectedChip.value = DEFAULT_DISPLAY_CHIPS[0].value
-      console.log(`🎯 自动选择默认筹码: ${selectedChip.value}`)
+      selectedChipRef.value = DEFAULT_DISPLAY_CHIPS[0].value
+      console.log(`🎯 自动选择默认筹码: ${selectedChipRef.value}`)
       return
     }
 
@@ -521,7 +539,7 @@ export const useBettingStore = defineStore('betting', () => {
     }
 
     // 🔥 关键修复：更新前保存当前选中筹码
-    const currentSelectedChip = selectedChip.value
+    const currentSelectedChip = selectedChipRef.value
 
     // 更新显示筹码
     displayChips.value = validChips
@@ -532,11 +550,11 @@ export const useBettingStore = defineStore('betting', () => {
 
     if (!isCurrentChipInNewList) {
       // 如果当前选中的筹码不在新列表中，自动选择第一个
-      selectedChip.value = validChips[0].value
-      console.log(`🎯 当前筹码 ${currentSelectedChip} 不在新列表中，自动选择第一个: ${selectedChip.value}`)
+      selectedChipRef.value = validChips[0].value
+      console.log(`🎯 当前筹码 ${currentSelectedChip} 不在新列表中，自动选择第一个: ${selectedChipRef.value}`)
     } else {
       // 如果在新列表中，保持当前选择
-      console.log(`🎯 保持当前选中筹码: ${selectedChip.value}`)
+      console.log(`🎯 保持当前选中筹码: ${selectedChipRef.value}`)
     }
   }
 
@@ -593,7 +611,7 @@ export const useBettingStore = defineStore('betting', () => {
       const key = betType as BaccaratBetType
       const config = BET_ZONE_CONFIGS[key].simulationConfig
 
-      simulationTimers.value[key] = setInterval(() => {
+      simulationTimers.value[key] = window.setInterval(() => {
         const data = simulationData[key]
 
         // 随机增加人数（1-3人）
@@ -614,7 +632,7 @@ export const useBettingStore = defineStore('betting', () => {
     Object.keys(simulationTimers.value).forEach(betType => {
       const key = betType as BaccaratBetType
       if (simulationTimers.value[key]) {
-        clearInterval(simulationTimers.value[key]!)
+        window.clearInterval(simulationTimers.value[key]!)
         simulationTimers.value[key] = null
       }
     })
@@ -644,12 +662,14 @@ export const useBettingStore = defineStore('betting', () => {
     }
   }
 
-  // 选择筹码
+  // 🔥 关键修复：选择筹码方法 - 统一接口
   const selectChip = (amount: number): void => {
     const chip = availableChips.value.find(c => c.value === amount)
     if (chip) {
-      selectedChip.value = amount
+      selectedChipRef.value = amount
       console.log(`✅ 选择筹码: ${amount}`)
+    } else {
+      console.warn(`⚠️ 未找到值为 ${amount} 的筹码`)
     }
   }
 
@@ -671,7 +691,7 @@ export const useBettingStore = defineStore('betting', () => {
     console.log('🎰 投注 Store 初始化')
 
     // 重置状态
-    selectedChip.value = 10
+    selectedChipRef.value = 10
     balance.value = 10000
     gamePhase.value = 'betting'
     isCommissionFree.value = false
@@ -714,8 +734,10 @@ export const useBettingStore = defineStore('betting', () => {
   }
 
   return {
-    // 状态
+    // 🔥 关键修复：只暴露计算属性接口，避免重复定义
     selectedChip,
+
+    // 其他状态
     balance,
     gamePhase,
     isCommissionFree,
@@ -724,7 +746,7 @@ export const useBettingStore = defineStore('betting', () => {
     lastBets,
     simulationData,
     betLimits,
-    displayChips, // 🔥 修改：直接暴露 displayChips
+    displayChips,
     availableChips,
     blinkingZones,
 

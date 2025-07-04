@@ -1,409 +1,218 @@
-// src/stores/bettingHistoryStore.ts - 百家乐版本
+// src/stores/bettingHistoryStore.ts - 简化版
 import { defineStore } from 'pinia'
-import { ref, computed, reactive } from 'vue'
+import { ref, computed } from 'vue'
 import { getGlobalApiService } from '@/services/gameApi'
+import type { BettingHistoryParams, BettingHistoryItem } from '@/services/gameApi'
 
-// 百家乐投注记录类型
-export interface BaccaratBettingRecord {
-  id: string
-  game_number: string
-  table_id: string
-  user_id: string
-  bet_time: string
-  settle_time?: string
-
-  // 投注详情
-  bet_details: Array<{
-    bet_type: string          // 投注类型
-    bet_amount: number        // 投注金额
-    odds: string             // 赔率
-    win_amount: number       // 赢得金额
-    zone_name: string        // 投注区域名称
-  }>
-
-  // 金额统计
-  total_bet_amount: number
-  total_win_amount: number
-  net_amount: number
-
-  // 百家乐特有数据
-  banker_cards: string[]     // 庄家牌
-  player_cards: string[]     // 闲家牌
-  banker_score: number       // 庄家点数
-  player_score: number       // 闲家点数
-  game_result: string        // 游戏结果 (banker/player/tie)
-
-  // 状态
-  status: string             // 投注状态
-  is_settled: boolean        // 是否已结算
-  currency: string
-}
-
-// 投注历史查询参数
-export interface BettingHistoryParams {
-  page: number
-  pageSize: number
-  start_date?: string
-  end_date?: string
-  game_result?: string       // 按游戏结果筛选
-  bet_type?: string         // 按投注类型筛选
+// 简化的投注记录类型 - 基于 API 响应格式
+export interface BettingRecord {
+  id: string                  // 注单号
+  xue_number: string          // 靴号
+  pu_number: string           // 铺号
+  bet_amt: number            // 下注金额
+  win_amt: number            // 中奖金额
+  delta_amt: number          // 变化金额
+  detail: string             // 投注明细JSON
+  result: string             // 游戏结果
+  close_status: number       // 结束状态
+  created_at: string         // 创建时间
 }
 
 export const useBettingHistoryStore = defineStore('bettingHistory', () => {
-  // 基础状态
-  const records = ref<BaccaratBettingRecord[]>([])
-  const totalRecords = ref(0)
-  const totalPages = ref(0)
+  // 核心状态
+  const records = ref<BettingRecord[]>([])
   const currentPage = ref(1)
-  const pageSize = ref(20)
   const hasMore = ref(true)
-  const lastFetchTime = ref<number>(0)
+  const loading = ref(false)
+  const error = ref<string | null>(null)
 
-  // 加载状态
-  const loadingState = reactive({
-    loading: false,
-    refreshing: false,
-    loadingMore: false,
-    error: null as string | null
-  })
-
-  // 筛选条件
-  const filters = reactive({
-    dateStart: null as string | null,
-    dateEnd: null as string | null,
-    gameResult: null as string | null,    // 'banker' | 'player' | 'tie'
-    betType: null as string | null        // 投注类型筛选
-  })
+  // 固定每页大小
+  const pageSize = 20
 
   // 计算属性
   const isEmpty = computed(() => records.value.length === 0)
-  const isLoading = computed(() =>
-    loadingState.loading || loadingState.refreshing || loadingState.loadingMore
-  )
-  const canLoadMore = computed(() =>
-    hasMore.value && !isLoading.value && !loadingState.error
-  )
+  const isLoading = computed(() => loading.value)
+  const canLoadMore = computed(() => hasMore.value && !loading.value && !error.value)
 
-  // 判断数据是否过期
-  const isDataStale = computed(() => {
-    const staleThreshold = 30000 // 30秒
-    return !lastFetchTime.value || (Date.now() - lastFetchTime.value > staleThreshold)
-  })
-
-  // 统计信息计算
-  const currentPageStats = computed(() => {
-    const currentRecords = records.value
-    if (currentRecords.length === 0) {
+  // 基本统计
+  const basicStats = computed(() => {
+    if (records.value.length === 0) {
       return {
         totalBet: 0,
         totalWin: 0,
         netAmount: 0,
-        winCount: 0,
-        loseCount: 0,
-        tieCount: 0,
-        winRate: 0,
-        bankerWins: 0,
-        playerWins: 0,
-        tieWins: 0
+        totalGames: 0
       }
     }
 
-    const totalBet = currentRecords.reduce((sum, record) => sum + record.total_bet_amount, 0)
-    const totalWin = currentRecords.reduce((sum, record) => sum + record.total_win_amount, 0)
-    const netAmount = currentRecords.reduce((sum, record) => sum + record.net_amount, 0)
+    const totalBet = records.value.reduce((sum, record) => {
+      const betAmount = typeof record.bet_amt === 'number' ? record.bet_amt : 0
+      return sum + betAmount
+    }, 0)
 
-    const winCount = currentRecords.filter(record => record.net_amount > 0).length
-    const loseCount = currentRecords.filter(record => record.net_amount < 0).length
-    const tieCount = currentRecords.filter(record => record.net_amount === 0).length
+    const totalWin = records.value.reduce((sum, record) => {
+      const winAmount = typeof record.win_amt === 'number' ? record.win_amt : 0
+      return sum + winAmount
+    }, 0)
 
-    const winRate = currentRecords.length > 0 ? (winCount / currentRecords.length) * 100 : 0
+    const netAmount = records.value.reduce((sum, record) => {
+      const deltaAmount = typeof record.delta_amt === 'number' ? record.delta_amt : 0
+      return sum + deltaAmount
+    }, 0)
 
-    // 百家乐特有统计
-    const bankerWins = currentRecords.filter(record => record.game_result === 'banker').length
-    const playerWins = currentRecords.filter(record => record.game_result === 'player').length
-    const tieWins = currentRecords.filter(record => record.game_result === 'tie').length
+    const totalGames = records.value.length
 
     return {
       totalBet,
       totalWin,
       netAmount,
-      winCount,
-      loseCount,
-      tieCount,
-      winRate: Math.round(winRate * 100) / 100,
-      bankerWins,
-      playerWins,
-      tieWins
+      totalGames
     }
   })
 
-  // 构建查询参数
-  const buildQueryParams = (page: number = currentPage.value): BettingHistoryParams => {
-    const params: BettingHistoryParams = {
-      page,
-      pageSize: pageSize.value
-    }
-
-    // 添加筛选条件
-    if (filters.dateStart) {
-      params.start_date = filters.dateStart
-    }
-
-    if (filters.dateEnd) {
-      params.end_date = filters.dateEnd
-    }
-
-    if (filters.gameResult) {
-      params.game_result = filters.gameResult
-    }
-
-    if (filters.betType) {
-      params.bet_type = filters.betType
-    }
-
-    return params
-  }
-
-  // 获取投注记录
-  const fetchRecords = async (page: number = 1, append: boolean = false): Promise<void> => {
+  // 加载记录
+  const loadRecords = async (page: number = 1, append: boolean = false): Promise<void> => {
     try {
-      console.log(`🔄 百家乐历史记录: 获取投注记录 - 页码: ${page}, 追加: ${append}`)
+      console.log(`📚 加载投注记录 - 页码: ${page}, 追加: ${append}`)
 
-      const params = buildQueryParams(page)
-
-      // 设置加载状态
-      if (page === 1) {
-        if (append) {
-          loadingState.refreshing = true
-        } else {
-          loadingState.loading = true
-        }
-      } else {
-        loadingState.loadingMore = true
-      }
-
-      loadingState.error = null
+      loading.value = true
+      error.value = null
 
       const apiService = getGlobalApiService()
+      const gameParams = apiService.getGameParams()
+
+      const params: BettingHistoryParams = {
+        user_id: parseInt(gameParams.user_id),
+        table_id: gameParams.table_id,
+        game_type: parseInt(gameParams.game_type),
+        page,
+        page_size: pageSize
+      }
+
       const response = await apiService.getBettingHistory(params)
 
-      console.log('📥 百家乐历史: API 响应信息:', {
-        response,
-        recordsLength: response.records?.length || 0
-      })
+      console.log('📥 API 响应:', response)
 
-      const { records: newRecords = [], pagination = null } = response
+      // 使用 API 返回的数据格式
+      const newRecords = response.items || []
 
-      // 数据清洗和映射 - 百家乐特有处理
-      const cleanedRecords: BaccaratBettingRecord[] = newRecords.map((record: any, index: number) => {
-        return {
-          id: record.id || record.ID || `${Date.now()}-${index}`,
-          game_number: record.game_number || record.gameNumber || `B${Date.now()}`,
-          table_id: record.table_id || record.tableId || '1',
-          user_id: record.user_id || record.userId || '1',
-          bet_time: record.bet_time || record.betTime || new Date().toISOString(),
-          settle_time: record.settle_time || record.settleTime,
-
-          bet_details: Array.isArray(record.bet_details) ? record.bet_details :
-                      Array.isArray(record.betDetails) ? record.betDetails : [],
-          total_bet_amount: Number(record.total_bet_amount || record.totalBetAmount || 0),
-          total_win_amount: Number(record.total_win_amount || record.totalWinAmount || 0),
-          net_amount: Number(record.net_amount || record.netAmount ||
-            (Number(record.total_win_amount || record.totalWinAmount || 0) -
-             Number(record.total_bet_amount || record.totalBetAmount || 0))),
-
-          // 百家乐特有数据
-          banker_cards: Array.isArray(record.banker_cards) ? record.banker_cards :
-                       Array.isArray(record.bankerCards) ? record.bankerCards : [],
-          player_cards: Array.isArray(record.player_cards) ? record.player_cards :
-                       Array.isArray(record.playerCards) ? record.playerCards : [],
-          banker_score: Number(record.banker_score || record.bankerScore || 0),
-          player_score: Number(record.player_score || record.playerScore || 0),
-          game_result: record.game_result || record.gameResult || 'unknown',
-
-          status: record.status || 'pending',
-          is_settled: Boolean(record.is_settled || record.isSettled || false),
-          currency: record.currency || 'CNY'
-        } as BaccaratBettingRecord
-      })
+      // 数据清洗 - 适配 API 返回的格式
+      const cleanedRecords: BettingRecord[] = newRecords.map((record: BettingHistoryItem) => ({
+        id: record.id,
+        xue_number: record.xue_number,
+        pu_number: record.pu_number,
+        bet_amt: record.bet_amt,
+        win_amt: record.win_amt,
+        delta_amt: record.delta_amt,
+        detail: record.detail,
+        result: record.result,
+        close_status: record.close_status,
+        created_at: record.created_at
+      }))
 
       // 更新记录
       if (append && page > 1) {
         records.value = [...records.value, ...cleanedRecords]
-        console.log('➕ 百家乐历史: 追加数据，总记录数量:', records.value.length)
+        console.log('➕ 追加记录，总数量:', records.value.length)
       } else {
         records.value = cleanedRecords
-        console.log('🔄 百家乐历史: 替换数据，新记录数量:', cleanedRecords.length)
+        console.log('🔄 替换记录，新数量:', cleanedRecords.length)
       }
 
       // 更新分页信息
-      currentPage.value = pagination?.current_page || page
-      totalPages.value = pagination?.total_pages || Math.ceil(records.value.length / pageSize.value)
-      totalRecords.value = pagination?.total_records || records.value.length
-      hasMore.value = pagination?.has_more || false
-      lastFetchTime.value = Date.now()
+      currentPage.value = page
+      hasMore.value = response.has_next || false
 
-      console.log(`✅ 百家乐历史: 数据加载完成`, {
-        totalRecords: records.value.length,
+      console.log('✅ 记录加载完成', {
         currentPage: currentPage.value,
-        hasMore: hasMore.value
+        hasMore: hasMore.value,
+        totalRecords: records.value.length
       })
 
-    } catch (error: any) {
-      console.error('❌ 百家乐历史: 获取投注记录失败:', error)
-      loadingState.error = error.message || '获取投注记录失败'
-      throw error
+    } catch (err: any) {
+      console.error('❌ 加载投注记录失败:', err)
+      error.value = err.message || '加载失败'
     } finally {
-      loadingState.loading = false
-      loadingState.refreshing = false
-      loadingState.loadingMore = false
+      loading.value = false
     }
   }
 
-  // 强制刷新数据
-  const forceRefresh = async (): Promise<void> => {
-    try {
-      console.log('🚀 百家乐历史: 强制刷新投注记录数据')
-      loadingState.loading = true
-      loadingState.error = null
-
-      records.value = []
-      currentPage.value = 1
-      hasMore.value = true
-      lastFetchTime.value = 0
-
-      await fetchRecords(1, false)
-      console.log('✅ 百家乐历史: 强制刷新完成')
-
-    } catch (error: any) {
-      console.error('❌ 百家乐历史: 强制刷新失败:', error)
-      loadingState.error = error.message || '刷新数据失败'
-      throw error
-    } finally {
-      loadingState.loading = false
+  // 加载更多
+  const loadMore = async (): Promise<void> => {
+    if (!canLoadMore.value) {
+      console.log('⚠️ 无法加载更多')
+      return
     }
+
+    console.log('📄 加载更多记录')
+    await loadRecords(currentPage.value + 1, true)
   }
 
-  // 标记数据过期
-  const markDataStale = (): void => {
-    lastFetchTime.value = 0
-    console.log('📝 百家乐历史: 数据已标记为过期')
-  }
-
-  // 应用筛选条件
-  const applyFilters = async (newFilters: {
-    dateStart?: string | null
-    dateEnd?: string | null
-    gameResult?: string | null
-    betType?: string | null
-  }): Promise<void> => {
-    console.log('🔍 百家乐历史: 应用筛选条件:', newFilters)
-
-    Object.assign(filters, newFilters)
-    await fetchRecords(1, false)
-  }
-
-  // 重置筛选条件
-  const resetFilters = async (): Promise<void> => {
-    console.log('🔄 百家乐历史: 重置筛选条件')
-    filters.dateStart = null
-    filters.dateEnd = null
-    filters.gameResult = null
-    filters.betType = null
-    await fetchRecords(1, false)
-  }
-
-  // 按游戏结果筛选
-  const filterByGameResult = async (result: string | null): Promise<void> => {
-    await applyFilters({ gameResult: result })
-  }
-
-  // 按投注类型筛选
-  const filterByBetType = async (betType: string | null): Promise<void> => {
-    await applyFilters({ betType })
-  }
-
-  // 刷新记录
-  const refreshRecords = async (): Promise<void> => {
-    console.log('🔄 百家乐历史: 刷新记录')
-    await fetchRecords(1, true)
-  }
-
-  // 加载更多记录
-  const loadMoreRecords = async (): Promise<void> => {
-    if (canLoadMore.value) {
-      console.log('📄 百家乐历史: 加载更多记录')
-      await fetchRecords(currentPage.value + 1, true)
-    }
+  // 刷新
+  const refresh = async (): Promise<void> => {
+    console.log('🔄 刷新投注记录')
+    currentPage.value = 1
+    hasMore.value = true
+    await loadRecords(1, false)
   }
 
   // 清除错误
   const clearError = (): void => {
-    loadingState.error = null
+    error.value = null
+  }
+
+  // 格式化金额
+  const formatAmount = (amount: number): string => {
+    return amount.toLocaleString()
+  }
+
+  // 格式化时间
+  const formatTime = (timeString: string): string => {
+    const date = new Date(timeString)
+    return date.toLocaleString('zh-CN')
   }
 
   // 初始化
   const init = async (): Promise<void> => {
-    console.log('🚀 百家乐历史: 初始化投注记录')
+    console.log('📚 投注历史 Store 初始化')
 
     // 重置状态
     records.value = []
-    totalRecords.value = 0
-    totalPages.value = 0
     currentPage.value = 1
     hasMore.value = true
-    lastFetchTime.value = 0
+    loading.value = false
+    error.value = null
 
-    // 重置筛选条件
-    filters.dateStart = null
-    filters.dateEnd = null
-    filters.gameResult = null
-    filters.betType = null
-
-    clearError()
-
-    console.log('🔄 百家乐历史: 状态已重置')
-
-    // 获取初始数据
+    // 加载初始数据
     try {
-      console.log('📡 百家乐历史: 开始获取初始数据')
-      await fetchRecords(1, false)
-      console.log('✅ 百家乐历史: 初始化完成')
-    } catch (error) {
-      console.error('❌ 百家乐历史: 初始化失败:', error)
+      await loadRecords(1, false)
+      console.log('✅ 投注历史初始化完成')
+    } catch (err) {
+      console.error('❌ 投注历史初始化失败:', err)
     }
   }
 
   return {
     // 状态
     records,
-    totalRecords,
-    totalPages,
     currentPage,
-    pageSize,
     hasMore,
-    lastFetchTime,
-    loadingState,
-    filters,
+    loading,
+    error,
 
     // 计算属性
     isEmpty,
     isLoading,
     canLoadMore,
-    isDataStale,
-    currentPageStats,
+    basicStats,
 
     // 方法
-    fetchRecords,
-    forceRefresh,
-    markDataStale,
-    applyFilters,
-    resetFilters,
-    filterByGameResult,
-    filterByBetType,
-    refreshRecords,
-    loadMoreRecords,
+    loadRecords,
+    loadMore,
+    refresh,
     clearError,
+    formatAmount,
+    formatTime,
     init
   }
 })

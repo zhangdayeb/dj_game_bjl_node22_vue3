@@ -4,7 +4,7 @@
     <div class="video-section" :style="videoSectionStyles">
       <VideoPlayer
         ref="videoPlayerRef"
-        :videoUrl="videoUrl"
+        :videoUrl="gameStore.videoUrl"
         :showControls="false"
         :showZoomIndicator="false"
         :autoZoom="true"
@@ -15,11 +15,31 @@
 
       <!-- 浮动UI层 -->
       <div class="floating-ui-layer">
-        <UserBalance />
-        <RoundNumber :roundNumber="gameState.gameNumber" />
-        <GameStatus />
-        <Countdown :countdown="gameState.countdown" @countdownChange="handleCountdownChange" />
-        <SettingsBtn @click="showSettings = true" />
+        <UserBalance
+          :balance="gameStore.balance"
+          :currency="'CNY'"
+          @refresh="handleBalanceRefresh"
+        />
+        <RoundNumber
+          :roundNumber="gameStore.fullGameNumber"
+        />
+        <GameStatus
+          :gameStatus="gameStore.gameState.status"
+        />
+        <Countdown
+          :countdown="gameStore.gameState.countdown"
+          :maxTime="30"
+          @countdownChange="handleCountdownChange"
+        />
+        <SettingsBtn
+          :initialBgmEnabled="audioSettings.bgmEnabled"
+          :initialSfxEnabled="audioSettings.sfxEnabled"
+          @bgmToggle="handleBgmToggle"
+          @sfxToggle="handleSfxToggle"
+          @bettingHistory="handleBettingHistory"
+          @vipCenter="handleVipCenter"
+          @customerService="handleCustomerService"
+        />
       </div>
     </div>
 
@@ -27,6 +47,18 @@
     <div class="betting-section" :style="bettingSectionStyles">
       <!-- 使用整合后的投注区域布局 -->
       <BettingAreaLayout />
+
+      <!-- 筹码显示区域 -->
+      <ChipDisplay
+        :selectedChips="bettingStore.getDisplayChipsData"
+        :currentChip="bettingStore.selectedChip"
+        :canUndo="canUndo"
+        :canRepeat="bettingStore.hasLastRoundData"
+        @chipSelect="handleChipSelect"
+        @undo="handleUndo"
+        @repeat="handleRepeat"
+        @more="handleMoreChips"
+      />
     </div>
 
     <!-- 底部路珠区域 -->
@@ -60,6 +92,17 @@
         v-if="showSettings"
         @close="showSettings = false"
       />
+
+      <!-- 🔥 新增：筹码选择器 -->
+      <ChipSelector
+        v-if="showChipSelector"
+        :availableChips="bettingStore.availableChips"
+        :selectedChips="bettingStore.displayChips"
+        :maxSelection="5"
+        @confirm="handleChipSelectorConfirm"
+        @cancel="handleChipSelectorCancel"
+        @close="handleChipSelectorCancel"
+      />
     </div>
   </div>
 </template>
@@ -68,18 +111,20 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import type { CSSProperties } from 'vue'
 
+// Store 导入
+import { useGameStore } from '@/stores/gameStore'
+import { useBettingStore } from '@/stores/bettingStore'
+
 // 组件导入
 import VideoPlayer from '@/components/VideoPlayer/VideoPlayer.vue'
-
-// 整合后的投注区域布局
 import BettingAreaLayout from '@/components/BetArea/BettingAreaLayout.vue'
+import ChipDisplay from '@/components/BetArea/ChipDisplay.vue'
 
 // 特效组件
 import ResultEffect from '@/components/Effects/ResultEffect.vue'
 import WinningEffect from '@/components/Effects/WinningEffect.vue'
 
 // 浮动UI组件
-import GameHeader from '@/components/FloatingUI/GameHeader.vue'
 import UserBalance from '@/components/FloatingUI/UserBalance.vue'
 import RoundNumber from '@/components/FloatingUI/RoundNumber.vue'
 import GameStatus from '@/components/FloatingUI/GameStatus.vue'
@@ -90,6 +135,10 @@ import SettingsBtn from '@/components/FloatingUI/SettingsBtn.vue'
 import BettingHistoryModal from '@/components/Panels/BettingHistory/BettingHistoryModal.vue'
 import SettingsPanel from '@/components/Panels/SettingsPanel.vue'
 import ChipSelector from '@/components/Panels/ChipSelector.vue'
+
+// 🔥 使用 Store
+const gameStore = useGameStore()
+const bettingStore = useBettingStore()
 
 // 浏览器检测
 const getBrowserInfo = () => {
@@ -116,17 +165,20 @@ const showSettings = ref(false)
 const showBettingHistory = ref(false)
 const showResultEffect = ref(false)
 const showWinningEffect = ref(false)
+const showChipSelector = ref(false) // 🔥 新增：筹码选择器状态
 
-// 视频URL
-const videoUrl = ref('https://example.com/live-stream.m3u8')
+// 🔥 音频设置状态
+const audioSettings = ref({
+  bgmEnabled: true,
+  sfxEnabled: true
+})
+
+// 视频和路珠URL
+const videoUrl = computed(() => gameStore.videoUrl || 'https://example.com/live-stream.m3u8')
 const roadmapUrl = ref('https://example.com/roadmap')
 
-// 游戏状态
-const gameState = reactive({
-  gameNumber: 'T2501040001',
-  countdown: 0,
-  phase: 'waiting' as 'waiting' | 'betting' | 'dealing' | 'result'
-})
+// 🔥 计算属性 - 基于 Store 状态
+const canUndo = computed(() => bettingStore.betHistory.length > 0)
 
 // 获取真实视口高度
 const getRealViewportHeight = () => {
@@ -208,7 +260,74 @@ const roadmapSectionStyles = computed((): CSSProperties => {
   }
 })
 
-// 事件处理
+// 🔥 Store 事件处理
+
+// 筹码相关事件
+const handleChipSelect = (chipValue: number) => {
+  bettingStore.selectChip(chipValue)
+  console.log(`🎯 选择筹码: ${chipValue}`)
+}
+
+const handleMoreChips = () => {
+  showChipSelector.value = true
+  console.log('📱 打开筹码选择器')
+}
+
+const handleChipSelectorConfirm = (chipIds: string[]) => {
+  bettingStore.updateDisplayChips(chipIds)
+  showChipSelector.value = false
+  console.log('✅ 确认筹码选择:', chipIds)
+}
+
+const handleChipSelectorCancel = () => {
+  showChipSelector.value = false
+  console.log('❌ 取消筹码选择')
+}
+
+// 投注控制事件
+const handleUndo = () => {
+  bettingStore.undoLastBet()
+}
+
+const handleRepeat = () => {
+  bettingStore.restoreLastRound()
+}
+
+// 余额刷新
+const handleBalanceRefresh = () => {
+  // 模拟刷新余额
+  console.log('🔄 刷新余额')
+  // 这里可以调用 API 刷新余额
+}
+
+// 音频设置事件
+const handleBgmToggle = (enabled: boolean) => {
+  audioSettings.value.bgmEnabled = enabled
+  console.log(`🎵 背景音乐: ${enabled ? '开启' : '关闭'}`)
+}
+
+const handleSfxToggle = (enabled: boolean) => {
+  audioSettings.value.sfxEnabled = enabled
+  console.log(`🔊 音效: ${enabled ? '开启' : '关闭'}`)
+}
+
+// 面板事件
+const handleBettingHistory = () => {
+  showBettingHistory.value = true
+  console.log('📊 打开投注记录')
+}
+
+const handleVipCenter = () => {
+  console.log('👑 跳转会员中心')
+  // 这里可以实现跳转逻辑
+}
+
+const handleCustomerService = () => {
+  console.log('🎧 联系客服')
+  // 这里可以实现客服逻辑
+}
+
+// 视频播放器事件
 const handleZoomChange = (zoom: number) => {
   console.log('📹 视频缩放变化:', zoom)
 }
@@ -222,32 +341,33 @@ const handleVideoError = () => {
 }
 
 // 倒计时控制视频缩放
-const handleCountdownChange = (seconds: number, phase: string) => {
+const handleCountdownChange = (seconds: number) => {
   if (!videoPlayerRef.value) return
 
+  const phase = gameStore.gameState.status
   console.log(`⏰ 倒计时变化: ${seconds}秒, 阶段: ${phase}`)
 
   switch (phase) {
     case 'betting':
       // 投注阶段 - 保持正常大小
-      videoPlayerRef.value.resetZoom()
+      videoPlayerRef.value.resetZoom?.()
       break
 
     case 'dealing':
       // 开牌阶段 - 根据倒计时放大
       if (seconds <= 10) {
         const zoomLevel = 1 + (10 - seconds) * 0.05 // 逐渐放大
-        videoPlayerRef.value.setZoom(zoomLevel, true)
+        videoPlayerRef.value.setZoom?.(zoomLevel, true)
       }
       break
 
     case 'result':
       // 结果阶段 - 最大放大
-      videoPlayerRef.value.animateZoom(1.5, 1000)
+      videoPlayerRef.value.animateZoom?.(1.5, 1000)
 
       // 5秒后缩小回正常
       setTimeout(() => {
-        videoPlayerRef.value?.resetZoom()
+        videoPlayerRef.value?.resetZoom?.()
       }, 5000)
       break
   }
@@ -292,6 +412,11 @@ const handleVisualViewportChange = () => {
 onMounted(() => {
   console.log('🎮 GameSection 组件已挂载')
   console.log('🔧 浏览器信息:', browserInfo)
+
+  // 🔥 初始化 Store
+  gameStore.init()
+  bettingStore.init()
+
   console.log('📺 视频地址:', videoUrl.value)
   console.log('🎯 路珠地址:', roadmapUrl.value)
 
@@ -345,7 +470,13 @@ if (import.meta.env.DEV) {
   console.log('🔧 GameSection 调试信息:', {
     browserInfo,
     viewportHeight: viewportHeight.value,
-    containerWidth: containerWidth.value
+    containerWidth: containerWidth.value,
+    gameStore: gameStore.$state,
+    bettingStore: {
+      selectedChip: bettingStore.selectedChip,
+      displayChips: bettingStore.displayChips,
+      totalBets: bettingStore.totalUserBets
+    }
   })
 }
 </script>

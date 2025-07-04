@@ -1,4 +1,4 @@
-// src/stores/bettingStore.ts - 最终简化版
+// src/stores/bettingStore.ts - 增强版，支持筹码选择器
 import { defineStore } from 'pinia'
 import { ref, computed, reactive } from 'vue'
 
@@ -12,6 +12,27 @@ export type BaccaratBetType =
   | 'lucky-6'       // 幸运6
   | 'dragon-7'      // 龙7
   | 'panda-8'       // 熊8
+
+// 🔥 新增：筹码数据接口
+export interface ChipData {
+  id: string
+  value: number
+  name: string
+  image: string
+  displayValue: string
+}
+
+// 🔥 新增：所有可用筹码
+export const AVAILABLE_CHIPS: ChipData[] = [
+  { id: 'chip-1', value: 1, name: '1元', image: '/src/assets/images/chips/1.png', displayValue: '1' },
+  { id: 'chip-5', value: 5, name: '5元', image: '/src/assets/images/chips/5.png', displayValue: '5' },
+  { id: 'chip-10', value: 10, name: '10元', image: '/src/assets/images/chips/10.png', displayValue: '10' },
+  { id: 'chip-25', value: 25, name: '25元', image: '/src/assets/images/chips/25.png', displayValue: '25' },
+  { id: 'chip-50', value: 50, name: '50元', image: '/src/assets/images/chips/50.png', displayValue: '50' },
+  { id: 'chip-100', value: 100, name: '100元', image: '/src/assets/images/chips/100.png', displayValue: '100' },
+  { id: 'chip-500', value: 500, name: '500元', image: '/src/assets/images/chips/500.png', displayValue: '500' },
+  { id: 'chip-1000', value: 1000, name: '1000元', image: '/src/assets/images/chips/1000.png', displayValue: '1K' }
+]
 
 // 投注区域模拟数据
 interface BetZoneData {
@@ -27,7 +48,7 @@ interface BetHistoryStep {
   timestamp: number
 }
 
-// 默认筹码
+// 默认筹码（保持兼容性）
 export const DEFAULT_CHIPS = [1, 5, 10, 50, 100] as const
 
 export const useBettingStore = defineStore('betting', () => {
@@ -48,6 +69,10 @@ export const useBettingStore = defineStore('betting', () => {
 
   // 3. 当前选中筹码
   const selectedChip = ref(10)
+
+  // 🔥 新增：筹码选择器相关状态
+  const displayChips = ref<string[]>(['chip-10', 'chip-50', 'chip-100']) // 默认显示的筹码ID
+  const availableChips = ref(AVAILABLE_CHIPS) // 所有可用筹码
 
   // 4. 投注区域模拟数据
   const zoneSimulationData = reactive<Record<BaccaratBetType, BetZoneData>>({
@@ -97,14 +122,76 @@ export const useBettingStore = defineStore('betting', () => {
     return Object.values(lastRoundBets.value).some(amount => amount > 0)
   })
 
+  // 🔥 新增：获取显示的筹码数据
+  const getDisplayChipsData = computed(() => {
+    return availableChips.value.filter(chip =>
+      displayChips.value.includes(chip.id)
+    )
+  })
+
+  // 🔥 新增：获取当前筹码数据
+  const getCurrentChipData = computed(() => {
+    return availableChips.value.find(chip => chip.value === selectedChip.value)
+  })
+
+  // 🔥 新增：检查筹码是否可用
+  const isChipAvailable = computed(() => {
+    return (chipValue: number) => {
+      return availableChips.value.some(chip => chip.value === chipValue)
+    }
+  })
+
   // 🔧 核心方法
 
   // 选择筹码
   const selectChip = (amount: number): void => {
-    if (DEFAULT_CHIPS.includes(amount as any)) {
+    const chip = availableChips.value.find(c => c.value === amount)
+    if (chip) {
       selectedChip.value = amount
       console.log(`✅ 选择筹码: ${amount}`)
+    } else {
+      console.warn(`❌ 筹码 ${amount} 不可用`)
     }
+  }
+
+  // 🔥 新增：更新显示筹码
+  const updateDisplayChips = (chipIds: string[]): void => {
+    // 验证所有 chipId 都存在
+    const validChipIds = chipIds.filter(id =>
+      availableChips.value.some(chip => chip.id === id)
+    )
+
+    if (validChipIds.length === 0) {
+      console.warn('❌ 没有有效的筹码ID')
+      return
+    }
+
+    displayChips.value = validChipIds
+    console.log(`🎯 更新显示筹码:`, validChipIds)
+
+    // 如果当前选中的筹码不在显示列表中，切换到第一个
+    const currentChipExists = validChipIds.some(id => {
+      const chip = availableChips.value.find(c => c.id === id)
+      return chip?.value === selectedChip.value
+    })
+
+    if (!currentChipExists && validChipIds.length > 0) {
+      const firstChip = availableChips.value.find(c => c.id === validChipIds[0])
+      if (firstChip) {
+        selectedChip.value = firstChip.value
+        console.log(`🔄 自动切换到筹码: ${firstChip.value}`)
+      }
+    }
+  }
+
+  // 🔥 新增：根据ID获取筹码数据
+  const getChipById = (id: string): ChipData | undefined => {
+    return availableChips.value.find(chip => chip.id === id)
+  }
+
+  // 🔥 新增：根据值获取筹码数据
+  const getChipByValue = (value: number): ChipData | undefined => {
+    return availableChips.value.find(chip => chip.value === value)
   }
 
   // 撤销上一步
@@ -234,6 +321,13 @@ export const useBettingStore = defineStore('betting', () => {
     console.log(`➕ 添加投注: ${betType} +${amount}`)
   }
 
+  // 🔥 新增：重置筹码设置为默认
+  const resetChipSettings = (): void => {
+    displayChips.value = ['chip-10', 'chip-50', 'chip-100']
+    selectedChip.value = 10
+    console.log('🔄 重置筹码设置为默认')
+  }
+
   // 初始化
   const init = (): void => {
     console.log('🎰 投注 Store 初始化')
@@ -242,6 +336,9 @@ export const useBettingStore = defineStore('betting', () => {
     betHistory.value = []
     selectedChip.value = 10
     isCommissionFree.value = false
+
+    // 🔥 重置筹码设置
+    displayChips.value = ['chip-10', 'chip-50', 'chip-100']
 
     // 重置上一局投注
     Object.keys(lastRoundBets.value).forEach(betType => {
@@ -266,6 +363,8 @@ export const useBettingStore = defineStore('betting', () => {
     betHistory,
     lastRoundBets,
     selectedChip,
+    displayChips,
+    availableChips,
     zoneSimulationData,
     userBets,
     winningFlash,
@@ -274,9 +373,15 @@ export const useBettingStore = defineStore('betting', () => {
     // 计算属性
     totalUserBets,
     hasLastRoundData,
+    getDisplayChipsData,
+    getCurrentChipData,
+    isChipAvailable,
 
     // 方法
     selectChip,
+    updateDisplayChips,
+    getChipById,
+    getChipByValue,
     undoLastBet,
     clearAllBets,
     restoreLastRound,
@@ -287,6 +392,7 @@ export const useBettingStore = defineStore('betting', () => {
     getTotalBetAmount,
     formatAmount,
     addBetToHistory,
+    resetChipSettings,
     init
   }
 })

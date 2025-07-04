@@ -5,10 +5,10 @@
     <div class="chip-selection-area">
       <div class="chip-items">
         <div
-          v-for="(chip, index) in displayChips"
+          v-for="chip in selectedChips"
           :key="chip.id"
           class="chip-item"
-          :class="{ 'active': selectedChipId === chip.id }"
+          :class="{ 'active': chip.value === currentChip }"
           @click="handleChipSelect(chip)"
         >
           <div class="chip-image-container">
@@ -18,9 +18,9 @@
               class="chip-image"
               @error="handleImageError"
             />
-            <div class="chip-selection-indicator" v-if="selectedChipId === chip.id">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            <div class="chip-selection-indicator" v-if="chip.value === currentChip">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
               </svg>
             </div>
           </div>
@@ -36,10 +36,11 @@
       <div class="control-buttons">
         <!-- 撤销按钮 -->
         <button
-          class="control-btn undo-btn"
-          @click="handleUndo"
+          class="control-btn"
+          :class="{ 'disabled': !canUndo }"
           :disabled="!canUndo"
-          :title="'撤销'"
+          @click="handleUndo"
+          title="撤销上一步"
         >
           <div class="btn-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -49,12 +50,13 @@
           <span class="btn-text">撤销</span>
         </button>
 
-        <!-- 重复上一局按钮 -->
+        <!-- 重复按钮 -->
         <button
-          class="control-btn repeat-btn"
-          @click="handleRepeat"
+          class="control-btn"
+          :class="{ 'disabled': !canRepeat }"
           :disabled="!canRepeat"
-          :title="'重复上一局'"
+          @click="handleRepeat"
+          title="重复上一局"
         >
           <div class="btn-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -66,9 +68,9 @@
 
         <!-- 更多按钮 -->
         <button
-          class="control-btn more-btn"
+          class="control-btn control-btn-more"
           @click="handleMore"
-          :title="'更多选项'"
+          title="选择更多筹码"
         >
           <div class="btn-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -83,94 +85,71 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-
-// 筹码数据类型
-interface ChipData {
-  id: string
-  name: string
-  value: number
-  displayValue: string
-  image: string
-}
+import { computed } from 'vue'
+import type { ChipData } from '@/stores/bettingStore'
 
 // Props
 interface Props {
-  selectedChips?: ChipData[]
-  defaultSelectedIndex?: number
+  selectedChips: ChipData[]
+  currentChip: number
   canUndo?: boolean
   canRepeat?: boolean
+  defaultSelectedIndex?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
   selectedChips: () => [],
-  defaultSelectedIndex: 0,
+  currentChip: 10,
   canUndo: false,
-  canRepeat: false
+  canRepeat: false,
+  defaultSelectedIndex: 0
 })
 
 // Emits
 const emit = defineEmits<{
-  chipSelect: [chip: ChipData]
+  chipSelect: [chipValue: number]
   undo: []
   repeat: []
   more: []
 }>()
 
-// 默认筹码数据（当没有传入selectedChips时使用）
-const defaultChips: ChipData[] = [
-  { id: 'b_01', name: '1元', value: 1, displayValue: '1', image: '/src/assets/images/chips/B_01.png' },
-  { id: 'b_5', name: '5元', value: 5, displayValue: '5', image: '/src/assets/images/chips/B_05.png' },
-  { id: 'b_10', name: '10元', value: 10, displayValue: '10', image: '/src/assets/images/chips/B_10.png' },
-  { id: 'b_20', name: '20元', value: 20, displayValue: '20', image: '/src/assets/images/chips/B_20.png' },
-  { id: 'b_50', name: '50元', value: 50, displayValue: '50', image: '/src/assets/images/chips/B_50.png' }
-]
-
-// 响应式数据
-const selectedChipId = ref<string>('')
-
 // 计算属性
 const displayChips = computed(() => {
-  return props.selectedChips.length > 0 ? props.selectedChips : defaultChips
+  // 确保显示的筹码不为空
+  return props.selectedChips.length > 0 ? props.selectedChips : []
 })
 
 // 方法
 const handleChipSelect = (chip: ChipData) => {
-  selectedChipId.value = chip.id
-  emit('chipSelect', chip)
+  emit('chipSelect', chip.value)
+  console.log(`🎯 选择筹码: ${chip.value}`)
 }
 
 const handleUndo = () => {
   if (props.canUndo) {
     emit('undo')
+    console.log('↩️ 执行撤销操作')
   }
 }
 
 const handleRepeat = () => {
   if (props.canRepeat) {
     emit('repeat')
+    console.log('🔄 执行重复操作')
   }
 }
 
 const handleMore = () => {
   emit('more')
+  console.log('📱 打开筹码选择器')
 }
 
 const handleImageError = (event: Event) => {
   const img = event.target as HTMLImageElement
   // 使用默认占位图
-  img.src = '/src/assets/images/chips/chip.png'
+  img.src = '/src/assets/images/chips/default.png'
+  console.warn('⚠️ 筹码图片加载失败')
 }
-
-// 生命周期
-onMounted(() => {
-  // 设置默认选中的筹码
-  if (displayChips.value.length > 0) {
-    const defaultIndex = Math.min(props.defaultSelectedIndex, displayChips.value.length - 1)
-    selectedChipId.value = displayChips.value[defaultIndex].id
-    emit('chipSelect', displayChips.value[defaultIndex])
-  }
-})
 </script>
 
 <style scoped>
@@ -184,10 +163,13 @@ onMounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 12px 16px;
   color: white;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .chip-selection-area {
   flex: 1;
+  min-width: 0;
 }
 
 .chip-items {
@@ -196,6 +178,14 @@ onMounted(() => {
   gap: 12px;
   overflow-x: auto;
   padding: 4px;
+
+  /* 隐藏滚动条但保持功能 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chip-items::-webkit-scrollbar {
+  display: none;
 }
 
 .chip-item {
@@ -292,99 +282,51 @@ onMounted(() => {
   min-width: 60px;
 }
 
-.control-btn:hover:not(:disabled) {
+.control-btn:hover:not(.disabled) {
   background: rgba(255, 255, 255, 0.1);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
-.control-btn:disabled {
-  opacity: 0.5;
+.control-btn.disabled {
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-.undo-btn {
-  border-color: rgba(255, 193, 7, 0.3);
+.control-btn-more {
+  background: rgba(24, 144, 255, 0.1);
+  border-color: rgba(24, 144, 255, 0.2);
+  color: #40a9ff;
 }
 
-.undo-btn:hover:not(:disabled) {
-  background: rgba(255, 193, 7, 0.1);
-  border-color: rgba(255, 193, 7, 0.4);
-}
-
-.undo-btn .btn-icon {
-  color: #ffc107;
-}
-
-.repeat-btn {
-  border-color: rgba(82, 196, 26, 0.3);
-}
-
-.repeat-btn:hover:not(:disabled) {
-  background: rgba(82, 196, 26, 0.1);
-  border-color: rgba(82, 196, 26, 0.4);
-}
-
-.repeat-btn .btn-icon {
-  color: #52c41a;
-}
-
-.more-btn {
-  border-color: rgba(135, 208, 104, 0.3);
-}
-
-.more-btn:hover:not(:disabled) {
-  background: rgba(135, 208, 104, 0.1);
-  border-color: rgba(135, 208, 104, 0.4);
-}
-
-.more-btn .btn-icon {
-  color: #87d068;
+.control-btn-more:hover {
+  background: rgba(24, 144, 255, 0.2);
+  border-color: rgba(24, 144, 255, 0.3);
+  color: #69c0ff;
 }
 
 .btn-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
 }
 
 .btn-text {
   font-size: 10px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
-  line-height: 1;
+  white-space: nowrap;
 }
 
 @keyframes indicatorPulse {
   0% {
-    transform: scale(0);
+    transform: scale(0.8);
   }
   50% {
-    transform: scale(1.2);
+    transform: scale(1.1);
   }
   100% {
     transform: scale(1);
   }
-}
-
-/* 滚动条样式 */
-.chip-items::-webkit-scrollbar {
-  height: 4px;
-}
-
-.chip-items::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-}
-
-.chip-items::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 2px;
-}
-
-.chip-items::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
 }
 
 /* 响应式设计 */

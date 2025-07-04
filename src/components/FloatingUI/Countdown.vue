@@ -1,4 +1,4 @@
-<!-- src/components/FloatingUI/Countdown.vue - 改进UI版 -->
+<!-- src/components/FloatingUI/Countdown.vue - 修复居中版 -->
 <template>
   <div v-show="shouldShow" class="countdown">
     <div class="countdown-container">
@@ -22,10 +22,9 @@
             :class="{ 'urgent': isUrgent }"
           />
         </svg>
-        <!-- 🔥 修改：数字居中，去掉"秒"文字 -->
+        <!-- 🔥 修复：数字完全居中显示 -->
         <div class="countdown-number" :class="{ 'urgent': isUrgent }">{{ displayCountdown }}</div>
       </div>
-      <!-- 🔥 移除：不再显示"秒"标签 -->
     </div>
   </div>
 </template>
@@ -53,9 +52,9 @@ const emit = defineEmits<{
   countdownChange: [value: number]
 }>()
 
-// 🔥 调整：增大圆圈尺寸，使其更明显
-const circleSize = 50  // 从36增加到50
-const strokeWidth = 4  // 从3增加到4
+// 调整：增大圆圈尺寸，使其更明显
+const circleSize = 50
+const strokeWidth = 4
 const normalizedRadius = (circleSize - strokeWidth * 2) / 2
 const circumference = normalizedRadius * 2 * Math.PI
 
@@ -109,9 +108,9 @@ watch(() => shouldShow.value, (newValue) => {
   left: 15px;
   background: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(6px);
-  border-radius: 12px;  /* 🔥 增大圆角 */
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 12px;  /* 🔥 增大内边距 */
+  padding: 12px;
   color: white;
   z-index: 15;
   animation: slideInDown 0.3s ease-out;
@@ -121,13 +120,14 @@ watch(() => shouldShow.value, (newValue) => {
 .countdown-container {
   display: flex;
   align-items: center;
-  justify-content: center;  /* 🔥 居中对齐 */
+  justify-content: center;
 }
 
 .countdown-circle {
   position: relative;
-  width: 50px;   /* 🔥 增大尺寸 */
-  height: 50px;  /* 🔥 增大尺寸 */
+  width: 50px;
+  height: 50px;
+  /* 🔥 修复：使用 flexbox 完美居中 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -158,24 +158,30 @@ watch(() => shouldShow.value, (newValue) => {
 }
 
 .countdown-number {
-  font-size: 18px;      /* 🔥 增大字体 */
-  font-weight: 700;     /* 🔥 加粗字体 */
+  /* 🔥 修复：使用绝对定位精确居中 */
+  font-size: 18px;
+  font-weight: 700;
   color: white;
-  position: relative;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   z-index: 1;
   transition: color 0.3s ease;
-  /* 🔥 确保数字完全居中 */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
+  /* 🔥 关键：确保文字完美显示 */
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+  /* 🔥 确保不被其他元素影响 */
+  pointer-events: none;
 }
 
 /* 紧急状态数字颜色 */
 .countdown-number.urgent {
   color: #ff7875;
-  text-shadow: 0 0 8px rgba(255, 120, 117, 0.5);  /* 🔥 添加发光效果 */
+  text-shadow: 0 0 8px rgba(255, 120, 117, 0.5);
 }
 
 @keyframes slideInDown {
@@ -190,7 +196,7 @@ watch(() => shouldShow.value, (newValue) => {
 }
 
 /* 紧急状态脉动动画 */
-.countdown.urgent {
+.countdown:has(.countdown-number.urgent) {
   animation: pulse 1s ease-in-out infinite alternate;
 }
 
@@ -199,7 +205,7 @@ watch(() => shouldShow.value, (newValue) => {
     transform: scale(1);
   }
   to {
-    transform: scale(1.05);  /* 🔥 增大脉动幅度 */
+    transform: scale(1.05);
   }
 }
 
@@ -212,8 +218,8 @@ watch(() => shouldShow.value, (newValue) => {
   }
 
   .countdown-circle {
-    width: 44px;
-    height: 44px;
+    width: 50px;
+    height: 50px;
   }
 
   .countdown-number {
@@ -229,8 +235,8 @@ watch(() => shouldShow.value, (newValue) => {
   }
 
   .countdown-circle {
-    width: 40px;
-    height: 40px;
+    width: 50px;
+    height: 50px;
   }
 
   .countdown-number {

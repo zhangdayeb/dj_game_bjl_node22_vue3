@@ -26,26 +26,8 @@
 
     <!-- 中间投注区域 -->
     <div class="betting-section" :style="bettingSectionStyles">
-      <!-- 投注区域网格 -->
-      <div class="bet-zones-grid">
-        <BankerPairZone />
-        <BankerZone />
-        <TieZone />
-        <PlayerZone />
-        <PlayerPairZone />
-        <Dragon7Zone />
-        <Lucky6Zone />
-        <Panda8Zone />
-      </div>
-
-      <!-- 筹码选择和控制 -->
-      <div class="betting-controls">
-        <ChipSelector />
-        <BetControls />
-      </div>
-
-      <!-- 筹码显示 -->
-      <ChipDisplay />
+      <!-- 使用整合后的投注区域布局 -->
+      <BettingAreaLayout />
     </div>
 
     <!-- 底部路珠区域 -->
@@ -90,18 +72,8 @@ import type { CSSProperties } from 'vue'
 // 组件导入
 import VideoPlayer from '@/components/VideoPlayer/VideoPlayer.vue'
 
-// BetArea 相关组件
-import BankerPairZone from '@/components/BetArea/BetZones/BankerPairZone.vue'
-import BankerZone from '@/components/BetArea/BetZones/BankerZone.vue'
-import TieZone from '@/components/BetArea/BetZones/TieZone.vue'
-import PlayerZone from '@/components/BetArea/BetZones/PlayerZone.vue'
-import PlayerPairZone from '@/components/BetArea/BetZones/PlayerPairZone.vue'
-import Dragon7Zone from '@/components/BetArea/BetZones/Dragon7Zone.vue'
-import Lucky6Zone from '@/components/BetArea/BetZones/Lucky6Zone.vue'
-import Panda8Zone from '@/components/BetArea/BetZones/Panda8Zone.vue'
-import BetControls from '@/components/BetArea/BetControls.vue'
-import ChipDisplay from '@/components/BetArea/ChipDisplay.vue'
-import ChipSelector from '@/components/BetArea/ChipSelector.vue'
+// 整合后的投注区域布局
+import BettingAreaLayout from '@/components/BetArea/BettingAreaLayout.vue'
 
 // 特效组件
 import ResultEffect from '@/components/Effects/ResultEffect.vue'
@@ -118,6 +90,7 @@ import SettingsBtn from '@/components/FloatingUI/SettingsBtn.vue'
 // 面板组件
 import BettingHistoryModal from '@/components/Panels/BettingHistory/BettingHistoryModal.vue'
 import SettingsPanel from '@/components/Panels/SettingsPanel.vue'
+import ChipSelector from '@/components/Panels/ChipSelector.vue'
 
 // 浏览器检测
 const getBrowserInfo = () => {
@@ -139,6 +112,16 @@ const browserInfo = getBrowserInfo()
 // 组件引用
 const videoPlayerRef = ref<InstanceType<typeof VideoPlayer>>()
 
+// 面板状态
+const showSettings = ref(false)
+const showBettingHistory = ref(false)
+const showResultEffect = ref(false)
+const showWinningEffect = ref(false)
+
+// 视频URL
+const videoUrl = ref('https://example.com/live-stream.m3u8')
+const roadmapUrl = ref('https://example.com/roadmap')
+
 // 获取真实视口高度
 const getRealViewportHeight = () => {
   if (window.visualViewport) {
@@ -153,72 +136,73 @@ const calculateHeights = () => {
 
   // 不同浏览器的安全边距
   const safeMargin = browserInfo.isiOSSafari ? 20 :
-                    browserInfo.isTelegram ? 30 : 10
-
-  const availableHeight = realHeight - safeMargin
-
-  // 高度分配比例
-  const videoRatio = 0.45    // 视频区域占 45%
-  const roadmapRatio = 0.35  // 路珠区域根据宽度计算
-
-  // 计算各区域高度
-  const videoHeight = Math.floor(availableHeight * videoRatio)
-  const roadmapHeight = Math.floor(containerWidth.value * roadmapRatio)
-  const bettingHeight = availableHeight - videoHeight - roadmapHeight
+                    browserInfo.isTelegram ? 15 :
+                    browserInfo.isiOS ? 10 : 5
 
   return {
-    videoHeight: Math.max(videoHeight, 250),     // 最小高度 250px
-    bettingHeight: Math.max(bettingHeight, 200), // 最小高度 200px
-    roadmapHeight: Math.max(roadmapHeight, 150)  // 最小高度 150px
+    total: realHeight - safeMargin,
+    video: 350, // 固定视频高度
+    roadmap: 120, // 固定路珠高度
+    betting: Math.max(200, realHeight - 350 - 120 - safeMargin - 20) // 剩余空间给投注区
   }
 }
 
-// 计算后的高度
-const layoutHeights = computed(() => calculateHeights())
-
-// 样式计算 - 修正类型
-const sectionStyles = computed((): CSSProperties => ({
-  height: `${viewportHeight.value}px`,
-  display: 'flex',
-  flexDirection: 'column'
-}))
-
-const videoSectionStyles = computed((): CSSProperties => ({
-  height: `${layoutHeights.value.videoHeight}px`,
-  flexShrink: 0,
-  position: 'relative'
-}))
-
-const bettingSectionStyles = computed((): CSSProperties => ({
-  height: `${layoutHeights.value.bettingHeight}px`,
-  flexShrink: 0,
-  overflow: 'hidden'
-}))
-
-const roadmapSectionStyles = computed((): CSSProperties => ({
-  height: `${layoutHeights.value.roadmapHeight}px`,
-  flexShrink: 0
-}))
-
-// 视频相关
-const videoUrl = computed(() => {
-  // 这里可以根据实际需求动态生成视频URL
-  return import.meta.env.VITE_VIDEO_URL || '/video/game.mp4'
+// 计算样式
+const sectionStyles = computed((): CSSProperties => {
+  const heights = calculateHeights()
+  return {
+    height: `${heights.total}px`,
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    background: 'linear-gradient(135deg, #0d1b2a 0%, #1b4332 100%)',
+    position: 'relative',
+    overflow: 'hidden',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  }
 })
 
-// 路珠iframe地址
-const roadmapUrl = computed(() => {
-  // 这里可以根据实际需求动态生成URL
-  return import.meta.env.VITE_ROADMAP_URL || '/roadmap.html'
+const videoSectionStyles = computed((): CSSProperties => {
+  const heights = calculateHeights()
+  return {
+    height: `${heights.video}px`,
+    width: '100%',
+    position: 'relative',
+    background: '#000',
+    borderRadius: '0 0 8px 8px',
+    overflow: 'hidden',
+    flexShrink: 0
+  }
 })
 
-// 覆盖层状态
-const showResultEffect = ref(false)
-const showWinningEffect = ref(false)
-const showBettingHistory = ref(false)
-const showSettings = ref(false)
+const bettingSectionStyles = computed((): CSSProperties => {
+  const heights = calculateHeights()
+  return {
+    height: `${heights.betting}px`,
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '10px',
+    background: 'rgba(255, 255, 255, 0.05)',
+    flex: 1,
+    overflow: 'hidden'
+  }
+})
 
-// 视频播放器事件处理
+const roadmapSectionStyles = computed((): CSSProperties => {
+  const heights = calculateHeights()
+  return {
+    height: `${heights.roadmap}px`,
+    width: '100%',
+    position: 'relative',
+    background: '#1a1a1a',
+    borderRadius: '8px 8px 0 0',
+    overflow: 'hidden',
+    flexShrink: 0
+  }
+})
+
+// 事件处理
 const handleZoomChange = (zoom: number) => {
   console.log('📹 视频缩放变化:', zoom)
 }
@@ -395,23 +379,8 @@ if (import.meta.env.DEV) {
   flex-direction: column;
   padding: 10px;
   background: rgba(255, 255, 255, 0.05);
-
-  .bet-zones-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px;
-    margin-bottom: 10px;
-    flex: 1;
-    min-height: 0;
-  }
-
-  .betting-controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 10px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
+  flex: 1;
+  overflow: hidden;
 }
 
 .roadmap-section {
@@ -446,11 +415,6 @@ if (import.meta.env.DEV) {
 @media (max-width: 768px) {
   .betting-section {
     padding: 8px;
-
-    .bet-zones-grid {
-      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-      gap: 6px;
-    }
   }
 }
 

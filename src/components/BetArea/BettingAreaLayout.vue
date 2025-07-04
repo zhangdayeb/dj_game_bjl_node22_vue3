@@ -1,21 +1,28 @@
+<!-- src/components/BetArea/BettingAreaLayout.vue -->
 <template>
   <div class="betting-area-layout">
     <!-- 主要投注区域 -->
     <div class="main-betting-zones">
-      <!-- 第一排：龙7、庄对、幸运6、闲对、熊8 -->
+      <!-- 第一排：边注区域 -->
       <div class="betting-row first-row">
-        <Dragon7Zone class="zone-item side-bet" />
-        <BankerPairZone class="zone-item side-bet" />
-        <Lucky6Zone class="zone-item side-bet" />
-        <PlayerPairZone class="zone-item side-bet" />
-        <Panda8Zone class="zone-item side-bet" />
+        <BaseBetZone
+          v-for="config in firstRowZones"
+          :key="config.id"
+          :config="config"
+          :ref="(el) => setZoneRef(config.id, el)"
+          class="zone-item side-bet"
+        />
       </div>
 
-      <!-- 第二排：庄、和、闲 -->
+      <!-- 第二排：主要投注区域 -->
       <div class="betting-row second-row">
-        <BankerZone class="zone-item main-bet" />
-        <TieZone class="zone-item main-bet" />
-        <PlayerZone class="zone-item main-bet" />
+        <BaseBetZone
+          v-for="config in secondRowZones"
+          :key="config.id"
+          :config="config"
+          :ref="(el) => setZoneRef(config.id, el)"
+          class="zone-item main-bet"
+        />
       </div>
     </div>
 
@@ -30,163 +37,196 @@
 import { computed, ref, onMounted, watch } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
 import { useGameStore } from '@/stores/gameStore'
-import BankerPairZone from './BetZones/BankerPairZone.vue'
-import BankerZone from './BetZones/BankerZone.vue'
-import TieZone from './BetZones/TieZone.vue'
-import PlayerZone from './BetZones/PlayerZone.vue'
-import PlayerPairZone from './BetZones/PlayerPairZone.vue'
-import Dragon7Zone from './BetZones/Dragon7Zone.vue'
-import Lucky6Zone from './BetZones/Lucky6Zone.vue'
-import Panda8Zone from './BetZones/Panda8Zone.vue'
+import BaseBetZone from './BaseBetZone.vue'
+import { getZonesByCategory, type BetZoneConfig } from '@/configs/betZoneConfigs'
 
 const bettingStore = useBettingStore()
 const gameStore = useGameStore()
 
 // 状态提示
 const statusMessage = ref('')
-const statusType = ref<'success' | 'error' | 'warning'>('success')
+const statusType = ref<'success' | 'error' | 'info'>('info')
 
-// 显示状态提示
-const showStatusMessage = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+// 组件引用管理
+const zoneRefs = ref<Record<string, any>>({})
+
+// 🎯 配置驱动的区域列表
+const firstRowZones = computed((): BetZoneConfig[] => {
+  return getZonesByCategory('first-row')
+})
+
+const secondRowZones = computed((): BetZoneConfig[] => {
+  return getZonesByCategory('second-row')
+})
+
+// 🔧 工具方法
+const setZoneRef = (zoneId: string, el: any) => {
+  if (el) {
+    zoneRefs.value[zoneId] = el
+  }
+}
+
+const showGlobalMessage = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   statusMessage.value = message
   statusType.value = type
+
   setTimeout(() => {
     statusMessage.value = ''
   }, 3000)
 }
 
-// 初始化stores
-onMounted(() => {
-  bettingStore.init()
-  if (gameStore.init) {
-    gameStore.init()
-  }
-})
+// 🏆 游戏结果处理
+const handleGameResult = (result: any) => {
+  // 根据游戏结果触发相应区域的动画
+  const { winningZones, losingZones } = result
 
-// 游戏状态监听
-const gameState = computed(() => gameStore.gameState)
-const countdown = computed(() => gameStore.gameState?.countdown || 0)
-
-// 监听倒计时，在倒计时结束前2秒自动发送投注订单
-watch(() => countdown.value, (newCountdown) => {
-  if (newCountdown === 2 && bettingStore.hasActiveBets) {
-    autoConfirmBets()
-  }
-})
-
-// 自动确认投注订单（倒计时2秒时）
-const autoConfirmBets = async () => {
-  try {
-    if (bettingStore.hasActiveBets) {
-      // 这里可以添加向服务器发送投注的API调用
-      // await sendBetsToServer(bettingStore.currentBets)
-
-      console.log('✅ 倒计时2秒，投注数据已准备发送')
-      showStatusMessage('投注数据已准备发送到服务器', 'success')
+  // 播放中奖动画
+  winningZones.forEach((zoneId: string) => {
+    const zoneRef = zoneRefs.value[zoneId]
+    if (zoneRef && zoneRef.showWinAnimation) {
+      const winAmount = bettingStore.currentBets[zoneId] * getWinMultiplier(zoneId)
+      zoneRef.showWinAnimation(winAmount)
     }
-  } catch (error) {
-    console.error('❌ 自动发送投注订单失败:', error)
-    showStatusMessage('自动发送失败，请检查网络', 'error')
-  }
+  })
+
+  // 播放输钱动画
+  losingZones.forEach((zoneId: string) => {
+    const zoneRef = zoneRefs.value[zoneId]
+    if (zoneRef && zoneRef.showLoseAnimation) {
+      zoneRef.showLoseAnimation()
+    }
+  })
 }
+
+const getWinMultiplier = (zoneId: string): number => {
+  // 根据赔率计算倍数 (简化版)
+  const oddsMap: Record<string, number> = {
+    'dragon-7': 40,
+    'banker-pair': 11,
+    'lucky-6': 12, // 简化处理
+    'player-pair': 11,
+    'panda-8': 25,
+    'banker': 0.95,
+    'tie': 8,
+    'player': 1
+  }
+  return oddsMap[zoneId] || 1
+}
+
+// 🎮 游戏状态监听
+watch(() => gameStore.gameState.status, (newStatus) => {
+  if (newStatus === 'result') {
+    // 模拟游戏结果
+    setTimeout(() => {
+      const mockResult = {
+        winningZones: ['player'], // 示例：闲家赢
+        losingZones: ['banker', 'tie']
+      }
+      handleGameResult(mockResult)
+    }, 1000)
+  }
+})
+
+// 🎯 初始化
+onMounted(() => {
+  // 初始化投注store
+  if (bettingStore.init) {
+    bettingStore.init()
+  }
+
+  showGlobalMessage('欢迎来到百家乐游戏', 'info')
+})
 </script>
 
 <style scoped>
+/* 🎯 布局容器 */
 .betting-area-layout {
-  background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
-  border-radius: 12px;
-  padding: 8px; /* 🔥 进一步减少padding，确保更多空间给内容 */
-  color: white;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  position: relative;
-  height: 100%;
-  width: 100%; /* 🔥 确保占满父容器宽度 */
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden; /* 🔥 防止内容溢出 */
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  container-type: inline-size; /* 🔥 启用容器查询 */
 }
 
 .main-betting-zones {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px; /* 🔥 进一步减少gap，节省更多空间 */
-  flex: 1;
-  height: 100%;
-  width: 100%; /* 🔥 确保占满宽度 */
-  justify-content: space-between;
-  min-height: 0;
-  box-sizing: border-box;
+  gap: 6px;
+  overflow: hidden;
 }
 
+/* 🎯 行布局 */
 .betting-row {
   display: flex;
-  gap: 4px; /* 🔥 减少横向间距，确保右侧不被截断 */
-  align-items: stretch;
-  justify-content: space-between; /* 🔥 改为space-between，确保充分利用宽度 */
-  width: 100%;
-  min-height: 0;
-  box-sizing: border-box;
+  gap: 4px;
+  overflow: hidden;
 }
 
-/* 🔥 重新平衡第一排和第二排的比例 */
 .first-row {
-  flex: 0.55; /* 🔥 适度增加第一排空间，从0.45调整到0.55 */
+  flex: 0.6; /* 🔥 第一排占较少空间 */
+  min-height: 50px;
 }
 
-.first-row .zone-item {
-  flex: 1;
-  min-width: 0;
-  max-width: none;
-  height: 100%;
-  min-height: 50px; /* 🔥 恢复合理的最小高度 */
-  box-sizing: border-box;
-}
-
-/* 🔥 适度减少第二排空间，让比例更平衡 */
 .second-row {
-  flex: 1; /* 🔥 从1.2调整回1，让比例更协调 */
+  flex: 1; /* 🔥 第二排占主要空间 */
+  min-height: 80px;
 }
 
-.second-row .zone-item {
+/* 🎯 区域项目 */
+.zone-item {
   flex: 1;
-  min-width: 0; /* 🔥 允许收缩，防止溢出 */
-  max-width: none;
-  height: 100%;
-  min-height: 75px; /* 🔥 调整最小高度，确保内容显示完整但不过大 */
+  overflow: hidden;
   box-sizing: border-box;
+  max-width: calc(100% - 4px);
+  flex-shrink: 1;
 }
 
-/* 状态提示框 */
+.side-bet {
+  /* 边注区域特殊样式 */
+}
+
+.main-bet {
+  /* 主要投注区域特殊样式 */
+}
+
+/* 🎯 状态提示 */
 .status-toast {
   position: fixed;
-  top: 20px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
   padding: 12px 20px;
   border-radius: 8px;
-  font-weight: 600;
-  font-size: 14px;
   z-index: 1000;
   animation: slideDown 0.3s ease-out;
+  border: 1px solid;
 }
 
 .status-toast.success {
-  background: rgba(46, 204, 113, 0.9);
-  color: white;
+  border-color: #2ecc71;
+  background: rgba(46, 204, 113, 0.1);
+  backdrop-filter: blur(4px);
 }
 
 .status-toast.error {
-  background: rgba(231, 76, 60, 0.9);
-  color: white;
+  border-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+  backdrop-filter: blur(4px);
 }
 
-.status-toast.warning {
-  background: rgba(243, 156, 18, 0.9);
-  color: white;
+.status-toast.info {
+  border-color: #3498db;
+  background: rgba(52, 152, 219, 0.1);
+  backdrop-filter: blur(4px);
 }
 
+/* 🎬 动画 */
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -198,7 +238,7 @@ const autoConfirmBets = async () => {
   }
 }
 
-/* 🔥 优化响应式适配 */
+/* 📱 响应式适配 */
 @media (max-width: 768px) {
   .betting-area-layout {
     padding: 6px;
@@ -213,21 +253,13 @@ const autoConfirmBets = async () => {
   }
 
   .first-row {
-    flex: 0.5; /* 🔥 手机端进一步平衡比例 */
-  }
-
-  .first-row .zone-item {
+    flex: 0.5;
     min-height: 45px;
-    font-size: 10px;
   }
 
   .second-row {
-    flex: 1.1; /* 🔥 手机端给第二排稍多一点空间 */
-  }
-
-  .second-row .zone-item {
+    flex: 1.1;
     min-height: 70px;
-    font-size: 14px;
   }
 }
 
@@ -246,55 +278,16 @@ const autoConfirmBets = async () => {
 
   .first-row {
     flex: 0.45;
-  }
-
-  .first-row .zone-item {
     min-height: 40px;
-    font-size: 9px;
   }
 
   .second-row {
     flex: 1.2;
-  }
-
-  .second-row .zone-item {
     min-height: 65px;
-    font-size: 13px;
   }
 }
 
-/* 🔥 确保所有zone-item不会溢出 */
-.zone-item {
-  overflow: hidden;
-  box-sizing: border-box;
-  flex-shrink: 1; /* 🔥 允许收缩以适应容器 */
-  max-width: calc(100% - 4px); /* 🔥 确保不超出容器边界 */
-}
-
-/* 🔥 针对极小屏幕或容器的额外保护 */
-@media (max-width: 360px) {
-  .betting-area-layout {
-    padding: 2px;
-  }
-
-  .main-betting-zones {
-    gap: 1px;
-  }
-
-  .betting-row {
-    gap: 1px;
-  }
-
-  .first-row {
-    flex: 0.4;
-  }
-
-  .second-row {
-    flex: 1.3;
-  }
-}
-
-/* 🔥 确保在父容器较小时也能正常显示 */
+/* 🔧 容器查询 (现代浏览器支持) */
 @container (max-width: 400px) {
   .betting-row {
     gap: 2px;
@@ -302,6 +295,12 @@ const autoConfirmBets = async () => {
 
   .zone-item {
     font-size: 10px;
+  }
+}
+
+@container (max-width: 300px) {
+  .betting-row {
+    gap: 1px;
   }
 }
 </style>

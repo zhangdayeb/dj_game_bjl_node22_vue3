@@ -1,632 +1,837 @@
+<!-- src/components/Effects/WinningEffect.vue -->
 <template>
-  <teleport to="body">
-    <div v-if="isVisible" class="winning-effect-container">
-      <!-- 背景闪光效果 -->
-      <div class="background-flash" :class="{ 'flash-active': showFlash }"></div>
-      
-      <!-- 金币雨效果 -->
-      <div class="coin-rain-container">
-        <div 
-          v-for="coin in coins"
-          :key="coin.id"
-          class="coin"
-          :style="{
-            left: coin.x + 'px',
-            animationDelay: coin.delay + 's',
-            animationDuration: coin.duration + 's'
-          }"
-        >
-          💰
-        </div>
+  <div class="winning-effect-overlay">
+    <div class="winning-effect-container">
+      <!-- 背景粒子效果 -->
+      <div class="particles-bg">
+        <div
+          v-for="i in particleCount"
+          :key="i"
+          class="particle"
+          :style="getParticleStyle(i)"
+        ></div>
       </div>
-      
-      <!-- 烟花爆炸效果 -->
-      <div class="fireworks-container">
-        <div 
-          v-for="firework in fireworks"
-          :key="firework.id"
+
+      <!-- 爆炸光效 -->
+      <div class="explosion-effect" :class="{ 'active': showExplosion }">
+        <div class="explosion-ring" v-for="i in 3" :key="i" :style="{ animationDelay: `${i * 0.1}s` }"></div>
+      </div>
+
+      <!-- 主要内容 -->
+      <div class="winning-content" :class="[`type-${winType}`, { 'revealed': contentRevealed }]">
+        <!-- 中奖标题 -->
+        <div class="win-title" :class="winType">
+          <h1>{{ getWinTitle() }}</h1>
+          <div class="title-decoration">
+            <span v-for="i in 5" :key="i" class="decoration-star" :style="{ animationDelay: `${i * 0.1}s` }">★</span>
+          </div>
+        </div>
+
+        <!-- 金额显示 -->
+        <div class="amount-display">
+          <div class="amount-label">恭喜获得</div>
+          <div class="amount-value" :class="winType">
+            <span class="currency">$</span>
+            <span class="number">{{ animatedAmount }}</span>
+          </div>
+          <div class="amount-decoration">
+            <div class="glow-ring"></div>
+            <div class="pulse-ring"></div>
+          </div>
+        </div>
+
+        <!-- 特效装饰 -->
+        <div class="decorative-elements">
+          <!-- 飘动的金币 -->
+          <div class="floating-coins">
+            <div
+              v-for="i in coinCount"
+              :key="i"
+              class="coin"
+              :style="getCoinStyle(i)"
+            >
+              💰
+            </div>
+          </div>
+
+          <!-- 闪烁的钻石 -->
+          <div class="diamonds" v-if="winType === 'jackpot'">
+            <div
+              v-for="i in 8"
+              :key="i"
+              class="diamond"
+              :style="getDiamondStyle(i)"
+            >
+              💎
+            </div>
+          </div>
+
+          <!-- 彩带效果 -->
+          <div class="confetti" v-if="winType !== 'normal'">
+            <div
+              v-for="i in confettiCount"
+              :key="i"
+              class="confetti-piece"
+              :style="getConfettiStyle(i)"
+            ></div>
+          </div>
+        </div>
+
+        <!-- 倍数显示 -->
+        <div v-if="multiplier > 1" class="multiplier-display">
+          <span class="multiplier-text">{{ multiplier }}倍中奖!</span>
+        </div>
+
+        <!-- 继续按钮 -->
+        <button
+          v-if="showContinueButton"
+          class="continue-button"
+          @click="handleContinue"
+        >
+          <span>继续游戏</span>
+          <div class="button-glow"></div>
+        </button>
+      </div>
+
+      <!-- 烟花效果 -->
+      <div v-if="winType === 'jackpot'" class="fireworks">
+        <div
+          v-for="i in 6"
+          :key="i"
           class="firework"
-          :style="{
-            left: firework.x + 'px',
-            top: firework.y + 'px',
-            animationDelay: firework.delay + 's'
-          }"
+          :style="getFireworkStyle(i)"
         >
-          <div class="firework-spark"></div>
-          <div class="firework-spark"></div>
-          <div class="firework-spark"></div>
-          <div class="firework-spark"></div>
-          <div class="firework-spark"></div>
-          <div class="firework-spark"></div>
-          <div class="firework-spark"></div>
-          <div class="firework-spark"></div>
+          <div class="firework-spark" v-for="j in 8" :key="j" :style="getSparkStyle(j)"></div>
         </div>
-      </div>
-      
-      <!-- 中奖金额显示 -->
-      <div class="win-amount-display" :class="{ 'show': showWinAmount }">
-        <div class="win-text">恭喜中奖！</div>
-        <div class="win-amount">
-          <span class="currency">¥</span>
-          <span class="amount">{{ formattedWinAmount }}</span>
-        </div>
-        <div class="win-subtitle">{{ winDescription }}</div>
-      </div>
-      
-      <!-- 光环效果 -->
-      <div class="light-ring-container">
-        <div 
-          v-for="ring in lightRings"
-          :key="ring.id"
-          class="light-ring"
-          :style="{
-            animationDelay: ring.delay + 's',
-            animationDuration: ring.duration + 's'
-          }"
-        ></div>
-      </div>
-      
-      <!-- 星星闪烁效果 -->
-      <div class="stars-container">
-        <div 
-          v-for="star in stars"
-          :key="star.id"
-          class="star"
-          :style="{
-            left: star.x + 'px',
-            top: star.y + 'px',
-            animationDelay: star.delay + 's',
-            fontSize: star.size + 'px'
-          }"
-        >
-          ✨
-        </div>
-      </div>
-      
-      <!-- 彩带效果 -->
-      <div class="confetti-container">
-        <div 
-          v-for="confetti in confettiPieces"
-          :key="confetti.id"
-          class="confetti"
-          :style="{
-            left: confetti.x + 'px',
-            backgroundColor: confetti.color,
-            animationDelay: confetti.delay + 's',
-            animationDuration: confetti.duration + 's'
-          }"
-        ></div>
       </div>
     </div>
-  </teleport>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, defineExpose } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 // Props
 interface Props {
-  show: boolean
-  winAmount: number
+  winAmount?: number
   winType?: 'normal' | 'big' | 'super' | 'jackpot'
   duration?: number
+  multiplier?: number
+  autoClose?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  winAmount: 1000,
   winType: 'normal',
-  duration: 3000
+  duration: 5000,
+  multiplier: 1,
+  autoClose: true
 })
 
-// Emits
+// 事件定义
 const emit = defineEmits<{
-  'finished': []
+  finished: []
 }>()
 
 // 响应式数据
-const isVisible = ref(false)
-const showFlash = ref(false)
-const showWinAmount = ref(false)
-const currentWinAmount = ref(0)
-const currentWinType = ref<'normal' | 'big' | 'super' | 'jackpot'>('normal')
-const coins = ref<Array<{id: number, x: number, delay: number, duration: number}>>([])
-const fireworks = ref<Array<{id: number, x: number, y: number, delay: number}>>([])
-const lightRings = ref<Array<{id: number, delay: number, duration: number}>>([])
-const stars = ref<Array<{id: number, x: number, y: number, delay: number, size: number}>>([])
-const confettiPieces = ref<Array<{id: number, x: number, color: string, delay: number, duration: number}>>([])
+const animatedAmount = ref(0)
+const contentRevealed = ref(false)
+const showExplosion = ref(false)
+const showContinueButton = ref(false)
+const animationFrame = ref<number>()
 
 // 计算属性
-const formattedWinAmount = computed(() => {
-  return currentWinAmount.value.toLocaleString()
+const particleCount = computed(() => {
+  switch (props.winType) {
+    case 'normal': return 20
+    case 'big': return 40
+    case 'super': return 60
+    case 'jackpot': return 100
+    default: return 20
+  }
 })
 
-const winDescription = computed(() => {
-  const descriptions = {
-    'normal': '恭喜获得奖金！',
-    'big': '大奖来袭！',
-    'super': '超级大奖！',
-    'jackpot': '超级头奖！'
+const coinCount = computed(() => {
+  switch (props.winType) {
+    case 'normal': return 3
+    case 'big': return 6
+    case 'super': return 10
+    case 'jackpot': return 15
+    default: return 3
   }
-  return descriptions[currentWinType.value]
+})
+
+const confettiCount = computed(() => {
+  switch (props.winType) {
+    case 'big': return 30
+    case 'super': return 50
+    case 'jackpot': return 80
+    default: return 0
+  }
 })
 
 // 方法
-const generateCoins = () => {
-  coins.value = []
-  const coinCount = currentWinType.value === 'jackpot' ? 30 : 
-                    currentWinType.value === 'super' ? 20 : 
-                    currentWinType.value === 'big' ? 15 : 10
-  
-  for (let i = 0; i < coinCount; i++) {
-    coins.value.push({
-      id: i,
-      x: Math.random() * window.innerWidth,
-      delay: Math.random() * 1,
-      duration: 2 + Math.random() * 2
-    })
+const getWinTitle = () => {
+  switch (props.winType) {
+    case 'normal': return '恭喜中奖!'
+    case 'big': return '大奖来了!'
+    case 'super': return '超级大奖!'
+    case 'jackpot': return '🎉 JACKPOT 🎉'
+    default: return '恭喜中奖!'
   }
 }
 
-const generateFireworks = () => {
-  fireworks.value = []
-  const fireworkCount = currentWinType.value === 'jackpot' ? 8 : 
-                        currentWinType.value === 'super' ? 6 : 
-                        currentWinType.value === 'big' ? 4 : 2
-  
-  for (let i = 0; i < fireworkCount; i++) {
-    fireworks.value.push({
-      id: i,
-      x: Math.random() * window.innerWidth,
-      y: 100 + Math.random() * 200,
-      delay: Math.random() * 1.5
-    })
+const getParticleStyle = (index: number) => {
+  const angle = (index / particleCount.value) * 360
+  const radius = 50 + Math.random() * 100
+  const delay = Math.random() * 2
+  const duration = 2 + Math.random() * 3
+
+  return {
+    left: '50%',
+    top: '50%',
+    transform: `rotate(${angle}deg) translateY(-${radius}px)`,
+    animationDelay: `${delay}s`,
+    animationDuration: `${duration}s`
   }
 }
 
-const generateLightRings = () => {
-  lightRings.value = []
-  const ringCount = currentWinType.value === 'jackpot' ? 5 : 
-                    currentWinType.value === 'super' ? 4 : 
-                    currentWinType.value === 'big' ? 3 : 2
-  
-  for (let i = 0; i < ringCount; i++) {
-    lightRings.value.push({
-      id: i,
-      delay: i * 0.3,
-      duration: 2 + Math.random() * 1
-    })
+const getCoinStyle = (index: number) => {
+  const randomX = 10 + Math.random() * 80
+  const randomY = 20 + Math.random() * 60
+  const delay = Math.random() * 1
+  const duration = 3 + Math.random() * 2
+
+  return {
+    left: `${randomX}%`,
+    top: `${randomY}%`,
+    animationDelay: `${delay}s`,
+    animationDuration: `${duration}s`
   }
 }
 
-const generateStars = () => {
-  stars.value = []
-  const starCount = currentWinType.value === 'jackpot' ? 25 : 
-                    currentWinType.value === 'super' ? 20 : 
-                    currentWinType.value === 'big' ? 15 : 10
-  
-  for (let i = 0; i < starCount; i++) {
-    stars.value.push({
-      id: i,
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
-      delay: Math.random() * 2,
-      size: 12 + Math.random() * 12
-    })
+const getDiamondStyle = (index: number) => {
+  const angle = (index / 8) * 360
+  const radius = 150
+  const delay = index * 0.2
+
+  return {
+    left: '50%',
+    top: '50%',
+    transform: `rotate(${angle}deg) translateY(-${radius}px)`,
+    animationDelay: `${delay}s`
   }
 }
 
-const generateConfetti = () => {
-  confettiPieces.value = []
-  const confettiCount = currentWinType.value === 'jackpot' ? 40 : 
-                        currentWinType.value === 'super' ? 30 : 
-                        currentWinType.value === 'big' ? 20 : 15
-  const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8']
-  
-  for (let i = 0; i < confettiCount; i++) {
-    confettiPieces.value.push({
-      id: i,
-      x: Math.random() * window.innerWidth,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      delay: Math.random() * 1,
-      duration: 3 + Math.random() * 2
-    })
+const getConfettiStyle = (index: number) => {
+  const randomX = Math.random() * 100
+  const randomRotation = Math.random() * 360
+  const delay = Math.random() * 0.5
+  const duration = 3 + Math.random() * 2
+  const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3']
+  const color = colors[Math.floor(Math.random() * colors.length)]
+
+  return {
+    left: `${randomX}%`,
+    top: '-10px',
+    backgroundColor: color,
+    transform: `rotate(${randomRotation}deg)`,
+    animationDelay: `${delay}s`,
+    animationDuration: `${duration}s`
   }
 }
 
-// 🔥 修复：主要的中奖特效启动方法
-const startEffect = (winAmount?: number, winType?: 'normal' | 'big' | 'super' | 'jackpot') => {
-  console.log('🎉 WinningEffect 启动中奖特效:', {
-    winAmount: winAmount || props.winAmount,
-    winType: winType || props.winType,
-    propsWinAmount: props.winAmount,
-    propsWinType: props.winType,
-    propsShow: props.show
-  })
-  
-  // 使用传入的参数或 props 中的参数
-  currentWinAmount.value = winAmount || props.winAmount
-  currentWinType.value = winType || props.winType
-  
-  // 验证金额
-  if (currentWinAmount.value <= 0) {
-    console.error('🎉 中奖金额无效:', currentWinAmount.value)
-    return
+const getFireworkStyle = (index: number) => {
+  const positions = [
+    { x: 20, y: 20 },
+    { x: 80, y: 20 },
+    { x: 50, y: 40 },
+    { x: 15, y: 60 },
+    { x: 85, y: 60 },
+    { x: 50, y: 80 }
+  ]
+  const pos = positions[index] || { x: 50, y: 50 }
+  const delay = index * 0.3
+
+  return {
+    left: `${pos.x}%`,
+    top: `${pos.y}%`,
+    animationDelay: `${delay}s`
   }
-  
-  console.log('🎉 开始播放中奖动画:', {
-    amount: currentWinAmount.value,
-    type: currentWinType.value
-  })
-  
-  // 显示组件
-  isVisible.value = true
-  
-  // 生成所有特效元素
-  generateCoins()
-  generateFireworks()
-  generateLightRings()
-  generateStars()
-  generateConfetti()
-  
-  // 背景闪光
+}
+
+const getSparkStyle = (index: number) => {
+  const angle = (index / 8) * 360
+  const delay = Math.random() * 0.2
+
+  return {
+    transform: `rotate(${angle}deg) translateY(-30px)`,
+    animationDelay: `${delay}s`
+  }
+}
+
+const animateAmount = () => {
+  const duration = 2000 // 2秒动画
+  const steps = 60
+  const increment = props.winAmount / steps
+  let current = 0
+  let step = 0
+
+  const animate = () => {
+    if (step < steps) {
+      current += increment
+      animatedAmount.value = Math.floor(current)
+      step++
+      animationFrame.value = requestAnimationFrame(animate)
+    } else {
+      animatedAmount.value = props.winAmount
+    }
+  }
+
+  animate()
+}
+
+const startAnimation = () => {
+  // 爆炸效果
   setTimeout(() => {
-    showFlash.value = true
+    showExplosion.value = true
   }, 100)
-  
-  // 显示中奖金额
+
+  // 内容显示
   setTimeout(() => {
-    showWinAmount.value = true
+    contentRevealed.value = true
+  }, 300)
+
+  // 金额动画
+  setTimeout(() => {
+    animateAmount()
   }, 500)
-  
-  // 触发屏幕震动（如果支持）
-  if (navigator.vibrate) {
-    const vibrationPattern = currentWinType.value === 'jackpot' ? [200, 100, 200, 100, 200] :
-                           currentWinType.value === 'super' ? [150, 100, 150] :
-                           currentWinType.value === 'big' ? [100, 50, 100] : [100]
-    navigator.vibrate(vibrationPattern)
-  }
-  
-  // 结束特效
+
+  // 继续按钮
   setTimeout(() => {
-    endEffect()
-  }, props.duration)
+    showContinueButton.value = true
+  }, 3000)
+
+  // 自动关闭
+  if (props.autoClose) {
+    setTimeout(() => {
+      handleFinished()
+    }, props.duration)
+  }
 }
 
-const endEffect = () => {
-  console.log('🎉 结束中奖特效')
-  
-  isVisible.value = false
-  showFlash.value = false
-  showWinAmount.value = false
-  
-  // 清空所有特效数组
-  coins.value = []
-  fireworks.value = []
-  lightRings.value = []
-  stars.value = []
-  confettiPieces.value = []
-  
+const handleContinue = () => {
+  handleFinished()
+}
+
+const handleFinished = () => {
   emit('finished')
 }
 
-// 🔥 新增：简化的启动方法
-const startAnimation = (options?: { winAmount?: number; winType?: 'normal' | 'big' | 'super' | 'jackpot' }) => {
-  const amount = options?.winAmount || props.winAmount || 1000
-  const type = options?.winType || props.winType || 'normal'
-  startEffect(amount, type)
-}
-
-// 监听显示状态变化
-watch(() => props.show, (newVal) => {
-  console.log('🎉 监听到 show 属性变化:', newVal)
-  if (newVal) {
-    startEffect()
-  } else {
-    endEffect()
-  }
-})
-
-// 监听金额和类型变化
-watch(() => [props.winAmount, props.winType], ([newAmount, newType]) => {
-  console.log('🎉 监听到金额/类型变化:', { newAmount, newType })
-  if (props.show && newAmount > 0) {
-    startEffect(newAmount as number, newType as 'normal' | 'big' | 'super' | 'jackpot')
-  }
-})
-
-// 🔥 暴露方法给父组件
-defineExpose({
-  startEffect,
-  startAnimation,
-  endEffect,
-  isVisible,
-  currentWinAmount,
-  currentWinType
-})
-
-// 组件销毁时清理
-onUnmounted(() => {
-  endEffect()
-})
-
-// 🔥 开发模式调试
-if (import.meta.env.DEV) {
-  // 暴露到全局用于调试
-  ;(window as any).debugWinEffect = {
-    startEffect,
-    startAnimation,
-    endEffect,
-    isVisible,
-    currentWinAmount,
-    currentWinType,
-    showFlash,
-    showWinAmount
-  }
-  
-  onMounted(() => {
-    console.log('🎉 WinningEffect 组件已挂载，调试对象已暴露到 window.debugWinEffect')
+// 生命周期
+onMounted(() => {
+  console.log('🎉 中奖特效组件挂载', {
+    amount: props.winAmount,
+    type: props.winType
   })
-}
+  startAnimation()
+})
+
+onUnmounted(() => {
+  if (animationFrame.value) {
+    cancelAnimationFrame(animationFrame.value)
+  }
+  console.log('🎉 中奖特效组件卸载')
+})
 </script>
 
 <style scoped>
-.winning-effect-container {
+.winning-effect-overlay {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(ellipse at center, rgba(255, 215, 0, 0.3) 0%, rgba(0, 0, 0, 0.9) 100%);
+  backdrop-filter: blur(4px);
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: overlayFadeIn 0.5s ease-out;
+}
+
+.winning-effect-container {
+  position: relative;
+  width: 100%;
+  max-width: 600px;
   height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.particles-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   pointer-events: none;
-  z-index: 9999;
   overflow: hidden;
 }
 
-/* 背景闪光效果 */
-.background-flash {
+.particle {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
+  width: 4px;
+  height: 4px;
+  background: radial-gradient(circle, #ffd700 0%, #ffb300 100%);
+  border-radius: 50%;
+  animation: particleFloat 4s ease-out infinite;
+}
+
+.explosion-effect {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.explosion-effect.active .explosion-ring {
+  animation: explosionRing 0.8s ease-out;
+}
+
+.explosion-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100px;
+  height: 100px;
+  border: 3px solid #ffd700;
+  border-radius: 50%;
   opacity: 0;
-  transition: opacity 0.3s ease;
 }
 
-.background-flash.flash-active {
+.winning-content {
+  background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+  border-radius: 24px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  padding: 40px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.winning-content.revealed {
   opacity: 1;
-  animation: flashPulse 2s ease-in-out infinite;
+  transform: scale(1);
 }
 
-@keyframes flashPulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.6; }
+.winning-content::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  background: linear-gradient(45deg, #ffd700, #ff6b6b, #4ecdc4, #ffd700);
+  border-radius: 24px;
+  z-index: -1;
+  animation: borderGlow 3s ease-in-out infinite;
 }
 
-/* 金币雨效果 */
-.coin-rain-container {
+.winning-content.type-normal::before {
+  background: linear-gradient(45deg, #4ecdc4, #45b7d1, #4ecdc4);
+}
+
+.winning-content.type-big::before {
+  background: linear-gradient(45deg, #ffd700, #ffb300, #ffd700);
+}
+
+.winning-content.type-super::before {
+  background: linear-gradient(45deg, #ff6b6b, #ff4757, #ff6b6b);
+}
+
+.winning-content.type-jackpot::before {
+  background: linear-gradient(45deg, #ffd700, #ff6b6b, #4ecdc4, #96ceb4, #feca57, #ffd700);
+  background-size: 300% 300%;
+  animation: rainbowGlow 2s ease-in-out infinite;
+}
+
+.win-title {
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.win-title h1 {
+  font-size: 36px;
+  font-weight: 900;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  animation: titlePulse 2s ease-in-out infinite;
+}
+
+.win-title.normal h1 {
+  color: #4ecdc4;
+  text-shadow: 0 0 20px rgba(78, 205, 196, 0.6);
+}
+
+.win-title.big h1 {
+  color: #ffd700;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+}
+
+.win-title.super h1 {
+  color: #ff6b6b;
+  text-shadow: 0 0 20px rgba(255, 107, 107, 0.6);
+}
+
+.win-title.jackpot h1 {
+  background: linear-gradient(45deg, #ffd700, #ff6b6b, #4ecdc4);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% 200%;
+  animation: rainbowText 2s ease-in-out infinite, titlePulse 2s ease-in-out infinite;
+}
+
+.title-decoration {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+}
+
+.decoration-star {
+  color: #ffd700;
+  font-size: 20px;
+  animation: starTwinkle 1.5s ease-in-out infinite;
+}
+
+.amount-display {
+  position: relative;
+  margin: 40px 0;
+}
+
+.amount-label {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.amount-value {
+  font-size: 48px;
+  font-weight: 900;
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 0 30px currentColor;
+}
+
+.amount-value.normal {
+  color: #4ecdc4;
+}
+
+.amount-value.big {
+  color: #ffd700;
+}
+
+.amount-value.super {
+  color: #ff6b6b;
+}
+
+.amount-value.jackpot {
+  background: linear-gradient(45deg, #ffd700, #ff6b6b, #4ecdc4);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% 200%;
+  animation: rainbowText 2s ease-in-out infinite;
+}
+
+.currency {
+  font-size: 0.7em;
+  vertical-align: top;
+  margin-right: 4px;
+}
+
+.number {
+  animation: numberCount 0.1s ease-out;
+}
+
+.amount-decoration {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.glow-ring,
+.pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid currentColor;
+}
+
+.glow-ring {
+  width: 200px;
+  height: 200px;
+  opacity: 0.3;
+  animation: ringGlow 3s ease-in-out infinite;
+}
+
+.pulse-ring {
+  width: 150px;
+  height: 150px;
+  opacity: 0.5;
+  animation: ringPulse 2s ease-in-out infinite;
+}
+
+.decorative-elements {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.floating-coins {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 
 .coin {
   position: absolute;
-  top: -50px;
   font-size: 24px;
-  animation: coinFall linear forwards;
-  pointer-events: none;
+  animation: coinFloat 4s ease-in-out infinite;
 }
 
-@keyframes coinFall {
-  0% {
-    transform: translateY(-50px) rotate(0deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(100vh) rotate(360deg);
-    opacity: 0.7;
-  }
-}
-
-/* 烟花爆炸效果 */
-.fireworks-container {
+.diamonds {
   position: absolute;
   top: 0;
   left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.diamond {
+  position: absolute;
+  font-size: 20px;
+  animation: diamondSpin 3s linear infinite;
+}
+
+.confetti {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.confetti-piece {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  animation: confettiFall 4s linear infinite;
+}
+
+.multiplier-display {
+  margin: 20px 0;
+  padding: 12px 24px;
+  background: rgba(255, 215, 0, 0.1);
+  border: 2px solid #ffd700;
+  border-radius: 12px;
+  display: inline-block;
+}
+
+.multiplier-text {
+  color: #ffd700;
+  font-size: 18px;
+  font-weight: 700;
+  animation: multiplierGlow 1.5s ease-in-out infinite;
+}
+
+.continue-button {
+  background: linear-gradient(135deg, #ffd700 0%, #ffb300 100%);
+  color: #1a1a2e;
+  border: none;
+  padding: 16px 40px;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  margin-top: 30px;
+  opacity: 0;
+  animation: buttonFadeIn 0.8s ease-out forwards;
+}
+
+.continue-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px rgba(255, 215, 0, 0.4);
+}
+
+.continue-button span {
+  position: relative;
+  z-index: 2;
+}
+
+.button-glow {
+  position: absolute;
+  top: 0;
+  left: -100%;
   width: 100%;
   height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: buttonShine 2s ease-in-out infinite;
+}
+
+.fireworks {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
 }
 
 .firework {
   position: absolute;
-  width: 4px;
-  height: 4px;
-  animation: fireworkExplode 1.5s ease-out forwards;
+  animation: fireworkBurst 2s ease-out infinite;
 }
 
 .firework-spark {
   position: absolute;
   width: 4px;
   height: 4px;
-  background: #FFD700;
+  background: radial-gradient(circle, #ffd700 0%, #ff6b6b 50%, #4ecdc4 100%);
   border-radius: 50%;
-  animation: sparkFly 1.5s ease-out forwards;
+  animation: sparkFly 1.5s ease-out infinite;
 }
 
-.firework-spark:nth-child(1) { transform: rotate(0deg); }
-.firework-spark:nth-child(2) { transform: rotate(45deg); }
-.firework-spark:nth-child(3) { transform: rotate(90deg); }
-.firework-spark:nth-child(4) { transform: rotate(135deg); }
-.firework-spark:nth-child(5) { transform: rotate(180deg); }
-.firework-spark:nth-child(6) { transform: rotate(225deg); }
-.firework-spark:nth-child(7) { transform: rotate(270deg); }
-.firework-spark:nth-child(8) { transform: rotate(315deg); }
+/* 动画定义 */
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
-@keyframes fireworkExplode {
+@keyframes particleFloat {
   0% {
-    transform: scale(0);
-    opacity: 1;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
   }
-  50% {
-    transform: scale(1);
+  20% {
     opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
   }
   100% {
-    transform: scale(1.5);
     opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
   }
 }
 
-@keyframes sparkFly {
-  0% {
-    transform: translateX(0) translateY(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(60px) translateY(60px);
-    opacity: 0;
-  }
-}
-
-/* 中奖金额显示 */
-.win-amount-display {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  background: linear-gradient(135deg, rgba(255, 215, 0, 0.95), rgba(255, 193, 7, 0.95));
-  border-radius: 20px;
-  padding: 30px 40px;
-  border: 3px solid #FFD700;
-  box-shadow: 0 10px 30px rgba(255, 215, 0, 0.5);
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.5);
-  transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.win-amount-display.show {
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-  animation: winAmountBounce 2s ease-in-out infinite;
-}
-
-@keyframes winAmountBounce {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); }
-  50% { transform: translate(-50%, -50%) scale(1.05); }
-}
-
-.win-text {
-  font-size: 18px;
-  font-weight: bold;
-  color: #B8860B;
-  margin-bottom: 10px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.win-amount {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.currency {
-  font-size: 24px;
-  font-weight: bold;
-  color: #B8860B;
-}
-
-.amount {
-  font-size: 36px;
-  font-weight: 900;
-  color: #B8860B;
-  font-family: 'Courier New', monospace;
-  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
-}
-
-.win-subtitle {
-  font-size: 14px;
-  color: #8B7355;
-  font-weight: 600;
-}
-
-/* 光环效果 */
-.light-ring-container {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.light-ring {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 200px;
-  height: 200px;
-  border: 3px solid rgba(255, 215, 0, 0.6);
-  border-radius: 50%;
-  animation: ringExpand ease-out forwards;
-}
-
-@keyframes ringExpand {
+@keyframes explosionRing {
   0% {
     width: 50px;
     height: 50px;
     opacity: 1;
   }
   100% {
-    width: 400px;
-    height: 400px;
+    width: 300px;
+    height: 300px;
     opacity: 0;
   }
 }
 
-/* 星星闪烁效果 */
-.stars-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.star {
-  position: absolute;
-  animation: starTwinkle 2s ease-in-out infinite;
+@keyframes titlePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 @keyframes starTwinkle {
   0%, 100% {
-    opacity: 0.3;
-    transform: scale(0.8) rotate(0deg);
+    opacity: 0.5;
+    transform: scale(1);
   }
   50% {
     opacity: 1;
-    transform: scale(1.2) rotate(180deg);
+    transform: scale(1.2);
   }
 }
 
-/* 彩带效果 */
-.confetti-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+@keyframes numberCount {
+  from {
+    transform: translateY(-5px);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
-.confetti {
-  position: absolute;
-  top: -10px;
-  width: 10px;
-  height: 10px;
-  animation: confettiFall linear forwards;
+@keyframes ringGlow {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 0.6;
+  }
+}
+
+@keyframes ringPulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.8;
+  }
+}
+
+@keyframes coinFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translateY(-20px) rotate(180deg);
+    opacity: 1;
+  }
+}
+
+@keyframes diamondSpin {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
 }
 
 @keyframes confettiFall {
@@ -635,82 +840,159 @@ if (import.meta.env.DEV) {
     opacity: 1;
   }
   100% {
-    transform: translateY(100vh) rotate(720deg);
+    transform: translateY(100vh) rotate(360deg);
     opacity: 0;
   }
 }
 
-/* 响应式适配 */
+@keyframes multiplierGlow {
+  0%, 100% {
+    text-shadow: 0 0 10px #ffd700;
+  }
+  50% {
+    text-shadow: 0 0 20px #ffd700, 0 0 30px #ffd700;
+  }
+}
+
+@keyframes buttonFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes buttonShine {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@keyframes fireworkBurst {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes sparkFly {
+  0% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--random-x, 0), var(--random-y, 0));
+    opacity: 0;
+  }
+}
+
+@keyframes borderGlow {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes rainbowGlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes rainbowText {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
-  .win-amount-display {
-    padding: 20px 30px;
-    margin: 0 20px;
+  .winning-content {
+    padding: 30px 20px;
+    margin: 20px;
   }
-  
-  .win-text {
-    font-size: 16px;
-  }
-  
-  .currency {
-    font-size: 20px;
-  }
-  
-  .amount {
+
+  .win-title h1 {
     font-size: 28px;
   }
-  
-  .win-subtitle {
-    font-size: 12px;
+
+  .amount-value {
+    font-size: 36px;
   }
-  
-  .coin {
-    font-size: 20px;
+
+  .amount-label {
+    font-size: 16px;
   }
-  
-  .star {
-    font-size: 16px !important;
+
+  .glow-ring {
+    width: 150px;
+    height: 150px;
+  }
+
+  .pulse-ring {
+    width: 120px;
+    height: 120px;
+  }
+
+  .continue-button {
+    padding: 14px 32px;
+    font-size: 16px;
   }
 }
 
 @media (max-width: 480px) {
-  .win-amount-display {
-    padding: 15px 20px;
-    margin: 0 15px;
+  .winning-content {
+    padding: 20px 16px;
+    margin: 10px;
   }
-  
-  .win-text {
-    font-size: 14px;
-  }
-  
-  .currency {
-    font-size: 18px;
-  }
-  
-  .amount {
-    font-size: 24px;
-  }
-  
-  .win-subtitle {
-    font-size: 11px;
-  }
-  
-  .coin {
-    font-size: 18px;
-  }
-}
 
-/* 横屏适配 */
-@media (orientation: landscape) and (max-height: 500px) {
-  .win-amount-display {
-    padding: 15px 25px;
-  }
-  
-  .win-text {
-    font-size: 14px;
-  }
-  
-  .amount {
+  .win-title h1 {
     font-size: 24px;
+  }
+
+  .amount-value {
+    font-size: 32px;
+  }
+
+  .decoration-star {
+    font-size: 16px;
+  }
+
+  .coin {
+    font-size: 20px;
+  }
+
+  .diamond {
+    font-size: 16px;
+  }
+
+  .continue-button {
+    padding: 12px 24px;
+    font-size: 14px;
   }
 }
 </style>

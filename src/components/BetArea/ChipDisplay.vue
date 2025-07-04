@@ -1,11 +1,12 @@
-<!-- src/components/BetArea/ChipDisplay.vue - 改进版 -->
+<!-- src/components/BetArea/ChipDisplay.vue - 优化版：保持原布局+增强效果 -->
 <template>
   <div class="chip-display">
+    <!-- 🔥 保持原始横向布局，只增强效果 -->
     <div class="chip-control-layout">
       <!-- 撤销按钮 -->
       <button
-        class="control-btn"
-        :class="{ 'disabled': !canUndo }"
+        class="control-btn undo-btn"
+        :class="{ 'disabled': !canUndo, 'has-history': betHistoryCount > 0 }"
         :disabled="!canUndo"
         @click="handleUndo"
         title="撤销上一步"
@@ -16,15 +17,17 @@
           </svg>
         </div>
         <span class="btn-text">撤销</span>
+        <!-- 投注计数指示器 -->
+        <div class="bet-count-indicator" v-if="betHistoryCount > 0">{{ betHistoryCount }}</div>
       </button>
 
       <!-- 重复按钮 -->
       <button
-        class="control-btn"
-        :class="{ 'disabled': !canRepeat }"
+        class="control-btn repeat-btn"
+        :class="{ 'disabled': !canRepeat, 'available': canRepeat }"
         :disabled="!canRepeat"
         @click="handleRepeat"
-        title="重复上一局"
+        title="重复上一局投注"
       >
         <div class="btn-icon">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -32,16 +35,21 @@
           </svg>
         </div>
         <span class="btn-text">重复</span>
+        <!-- 上次投注金额提示 -->
+        <div class="last-bet-amount" v-if="lastBetAmount > 0">¥{{ formatAmount(lastBetAmount) }}</div>
       </button>
 
-      <!-- 🔥 筹码选择区域 - 只显示3个 -->
+      <!-- 🔥 筹码选择区域 - 保持原始布局，只增强效果 -->
       <div class="chip-selection-area">
         <div
-          v-for="chip in defaultChips"
+          v-for="chip in displayChips"
           :key="chip.id"
           class="chip-item"
-          :class="{ 'active': chip.value === currentChip }"
+          :class="{
+            'active': chip.value === currentChip
+          }"
           @click="handleChipSelect(chip)"
+
         >
           <div class="chip-image-container">
             <img
@@ -50,14 +58,16 @@
               class="chip-image"
               @error="handleImageError"
             />
-            <div class="chip-selection-indicator" v-if="chip.value === currentChip">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+
+            <!-- 🔥 去掉余额不足遮罩 -->
+            <!-- <div class="insufficient-overlay" v-if="!isAffordable(chip.value)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
               </svg>
-            </div>
+            </div> -->
           </div>
           <div class="chip-info">
-            <span class="chip-value">{{ chip.displayValue }}</span>
+            <span class="chip-value">{{ formatChipValue(chip.value) }}</span>
           </div>
         </div>
       </div>
@@ -74,7 +84,9 @@
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 6L12 10.5 8.5 8 12 5.5 15.5 8zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
           </svg>
         </div>
-        <span class="btn-text">{{ isCommissionFree ? '免佣' : '免佣' }}</span>
+        <span class="btn-text">{{ isCommissionFree ? '免佣中' : '免佣' }}</span>
+        <!-- 免佣状态指示灯 -->
+        <div class="commission-status-dot" v-if="isCommissionFree"></div>
       </button>
 
       <!-- 更多按钮 -->
@@ -91,13 +103,48 @@
         <span class="btn-text">更多</span>
       </button>
     </div>
+
+    <!-- 🔥 去掉余额不足全局提示 -->
+    <!-- <div class="balance-warning" v-if="!isAffordable(currentChip)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+      </svg>
+      <span>余额不足，请选择较小面额筹码</span>
+    </div> -->
+
+    <!-- 🔥 筹码选择器弹窗 -->
+    <ChipSelector
+      v-if="showChipSelector"
+      @close="showChipSelector = false"
+      @select="handleChipSelectorSelect"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
-import type { ChipData } from '@/stores/bettingStore'
+import ChipSelector from '@/components/Panels/ChipSelector.vue'
+// 🔥 ChipData 类型定义
+interface ChipData {
+  id: string | number
+  value: number
+  name: string
+  image: string
+  displayValue: string
+}
+
+// Props
+interface Props {
+  chipCount?: number
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  chipCount: 3
+})
+
+// 响应式状态
+const showChipSelector = ref(false)
 
 // Store
 let bettingStore: any = null
@@ -109,59 +156,77 @@ try {
   // 创建默认对象避免错误
   bettingStore = {
     selectedChip: 10,
-    getDisplayChipsData: [],
-    hasLastRoundData: false,
-    betHistory: [],
+    balance: 10000,
+    currentBets: {},
+    confirmedBets: {},
+    lastBets: {},
+    totalBetAmount: 0,
+    availableBalance: 10000,
+    bettingPhase: 'betting',
     isCommissionFree: false,
+    getDisplayChipsData: [],
     selectChip: () => {},
-    undoLastBet: () => {},
-    restoreLastRound: () => {},
+    clearBets: () => {},
+    rebet: () => {},
     toggleCommissionFree: () => {}
   }
 }
 
-// 🔥 默认显示的3个筹码
-const defaultChips = computed(() => {
-  const allChips = bettingStore?.getDisplayChipsData || []
-
-  // 如果store中有数据，取前3个
-  if (allChips.length >= 3) {
-    return allChips.slice(0, 3)
+// 🔥 默认筹码数据
+const defaultChipsData: ChipData[] = [
+  {
+    id: 1,
+    value: 10,
+    name: '10元',
+    displayValue: '10',
+    image: '/src/assets/images/chips/chip-10.png'
+  },
+  {
+    id: 2,
+    value: 50,
+    name: '50元',
+    displayValue: '50',
+    image: '/src/assets/images/chips/chip-50.png'
+  },
+  {
+    id: 3,
+    value: 100,
+    name: '100元',
+    displayValue: '100',
+    image: '/src/assets/images/chips/chip-100.png'
   }
+]
 
-  // 否则返回默认的3个筹码
-  return [
-    {
-      id: 1,
-      value: 10,
-      name: '10元',
-      displayValue: '10',
-      image: '/src/assets/images/chips/chip-10.png'
-    },
-    {
-      id: 2,
-      value: 50,
-      name: '50元',
-      displayValue: '50',
-      image: '/src/assets/images/chips/chip-50.png'
-    },
-    {
-      id: 3,
-      value: 100,
-      name: '100元',
-      displayValue: '100',
-      image: '/src/assets/images/chips/chip-100.png'
-    }
-  ]
+// 计算属性
+const displayChips = computed(() => {
+  const storeChips = bettingStore?.getDisplayChipsData || []
+  const chips = storeChips.length > 0 ? storeChips : defaultChipsData
+  return chips.slice(0, props.chipCount)
 })
 
 const currentChip = computed(() => {
   return bettingStore?.selectedChip || 10
 })
 
+const availableBalance = computed(() => {
+  return bettingStore?.availableBalance || 0
+})
+
+const totalBetAmount = computed(() => {
+  return bettingStore?.totalBetAmount || 0
+})
+
+const isCommissionFree = computed(() => {
+  return bettingStore?.isCommissionFree || false
+})
+
 const canUndo = computed(() => {
   try {
-    return bettingStore?.betHistory?.length > 0 || false
+    const currentBets = bettingStore?.currentBets || {}
+    return Object.keys(currentBets).some(key => {
+      const amount = currentBets[key]
+      return typeof amount === 'number' && amount > 0
+    })
   } catch (error) {
     return false
   }
@@ -169,22 +234,60 @@ const canUndo = computed(() => {
 
 const canRepeat = computed(() => {
   try {
-    return bettingStore?.hasLastRoundData || false
+    const lastBets = bettingStore?.lastBets || {}
+    return Object.keys(lastBets).some(key => {
+      const amount = lastBets[key]
+      return typeof amount === 'number' && amount > 0
+    })
   } catch (error) {
     return false
   }
 })
 
-const isCommissionFree = computed(() => {
+const betHistoryCount = computed(() => {
   try {
-    return bettingStore?.isCommissionFree || false
+    const currentBets = bettingStore?.currentBets || {}
+    return Object.keys(currentBets).filter(key => {
+      const amount = currentBets[key]
+      return typeof amount === 'number' && amount > 0
+    }).length
   } catch (error) {
-    return false
+    return 0
   }
 })
+
+const lastBetAmount = computed(() => {
+  try {
+    const lastBets = bettingStore?.lastBets || {}
+    return Object.values(lastBets).reduce((sum: number, amount: unknown) => {
+      const numAmount = typeof amount === 'number' ? amount : 0
+      return sum + numAmount
+    }, 0)
+  } catch (error) {
+    return 0
+  }
+})
+
+// 方法
+const isAffordable = (chipValue: number): boolean => {
+  // 🔥 去掉余额限制，任何筹码都可以选择
+  return true
+}
+
+const formatChipValue = (value: number): string => {
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(0)}K`
+  }
+  return value.toString()
+}
+
+const formatAmount = (amount: number): string => {
+  return amount.toLocaleString()
+}
 
 // 事件处理方法
 const handleChipSelect = (chip: ChipData) => {
+  // 🔥 去掉余额检查，直接选择筹码
   try {
     bettingStore?.selectChip?.(chip.value)
     console.log(`🎯 选择筹码: ${chip.value}`)
@@ -197,7 +300,7 @@ const handleUndo = () => {
   if (!canUndo.value) return
 
   try {
-    bettingStore?.undoLastBet?.()
+    bettingStore?.clearBets?.()
     console.log('↩️ 执行撤销操作')
   } catch (error) {
     console.error('❌ 撤销失败:', error)
@@ -208,8 +311,8 @@ const handleRepeat = () => {
   if (!canRepeat.value) return
 
   try {
-    bettingStore?.restoreLastRound?.()
-    console.log('🔄 执行重复操作')
+    bettingStore?.rebet?.()
+    console.log('🔄 执行重复投注')
   } catch (error) {
     console.error('❌ 重复投注失败:', error)
   }
@@ -225,16 +328,29 @@ const handleCommissionToggle = () => {
 }
 
 const handleMore = () => {
+  showChipSelector.value = true
   console.log('📱 打开筹码选择器')
-  // 这里可以添加打开筹码选择器的逻辑
+}
+
+const handleChipSelectorSelect = (chip: ChipData) => {
+  handleChipSelect(chip)
+  showChipSelector.value = false
 }
 
 const handleImageError = (event: Event) => {
   const img = event.target as HTMLImageElement
-  // 使用默认占位图
   img.src = '/src/assets/images/chips/default.png'
   console.warn('⚠️ 筹码图片加载失败')
 }
+
+// 生命周期
+onMounted(() => {
+  console.log('🎰 筹码显示组件挂载 [优化版]', {
+    selectedChip: currentChip.value,
+    balance: availableBalance.value,
+    displayChipsCount: displayChips.value.length
+  })
+})
 </script>
 
 <style scoped>
@@ -249,7 +365,7 @@ const handleImageError = (event: Event) => {
   flex-shrink: 0;
 }
 
-/* 🔥 新布局：横向排列所有元素 */
+/* 🔥 保持原始横向布局 */
 .chip-control-layout {
   display: flex;
   align-items: center;
@@ -257,7 +373,7 @@ const handleImageError = (event: Event) => {
   justify-content: space-between;
 }
 
-/* 🔥 筹码选择区域 */
+/* 🔥 筹码选择区域 - 保持原始设计 */
 .chip-selection-area {
   display: flex;
   align-items: center;
@@ -271,13 +387,14 @@ const handleImageError = (event: Event) => {
   flex-direction: column;
   align-items: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: 10px;
   padding: 8px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   min-width: 64px;
   flex-shrink: 0;
+  position: relative;
 }
 
 .chip-item:hover {
@@ -286,22 +403,21 @@ const handleImageError = (event: Event) => {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 
-/* 🔥 选中状态：变大效果 */
+/* 🔥 选中状态增强 */
 .chip-item.active {
   background: rgba(24, 144, 255, 0.2);
   border-color: rgba(24, 144, 255, 0.5);
-  box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.3);
+  box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.3), 0 6px 20px rgba(24, 144, 255, 0.2);
   transform: scale(1.15);
 }
 
 .chip-image-container {
   position: relative;
-  width: 52px;   /* 🔥 增大基础尺寸 */
+  width: 52px;
   height: 52px;
   margin-bottom: 6px;
 }
 
-/* 🔥 选中的筹码图片更大 */
 .chip-item.active .chip-image-container {
   width: 58px;
   height: 58px;
@@ -313,22 +429,11 @@ const handleImageError = (event: Event) => {
   object-fit: contain;
   border-radius: 50%;
   transition: all 0.3s ease;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
 }
 
-.chip-selection-indicator {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 24px;
-  height: 24px;
-  background: #40a9ff;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  border: 3px solid rgba(0, 0, 0, 0.8);
-  animation: indicatorPulse 0.4s ease-out;
+.chip-item.active .chip-image {
+  filter: drop-shadow(0 4px 12px rgba(24, 144, 255, 0.4));
 }
 
 .chip-info {
@@ -338,19 +443,19 @@ const handleImageError = (event: Event) => {
 }
 
 .chip-value {
-  font-size: 14px;   /* 🔥 增大字体 */
-  font-weight: 700;  /* 🔥 加粗 */
+  font-size: 14px;
+  font-weight: 700;
   color: white;
   line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
-/* 🔥 选中状态的文字更大 */
 .chip-item.active .chip-value {
   font-size: 16px;
   color: #69c0ff;
 }
 
-/* 🔥 控制按钮样式优化 */
+/* 🔥 控制按钮增强效果 */
 .control-btn {
   display: flex;
   flex-direction: column;
@@ -359,12 +464,30 @@ const handleImageError = (event: Event) => {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
-  padding: 10px 12px;   /* 🔥 增大内边距 */
+  padding: 10px 12px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   color: white;
-  min-width: 64px;      /* 🔥 增大最小宽度 */
+  min-width: 64px;
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 🔥 悬停光扫效果 */
+.control-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.6s ease;
+}
+
+.control-btn:hover:not(.disabled)::before {
+  left: 100%;
 }
 
 .control-btn:hover:not(.disabled) {
@@ -373,9 +496,39 @@ const handleImageError = (event: Event) => {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
+.control-btn:active:not(.disabled) {
+  transform: translateY(0);
+}
+
 .control-btn.disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+.control-btn.disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* 🔥 特定按钮状态增强 */
+.undo-btn.has-history {
+  background: rgba(24, 144, 255, 0.1);
+  border-color: rgba(24, 144, 255, 0.2);
+  animation: undoGlow 3s ease-in-out infinite;
+}
+
+.repeat-btn.available {
+  background: rgba(82, 196, 26, 0.1);
+  border-color: rgba(82, 196, 26, 0.2);
+  color: #95de64;
+}
+
+.control-btn-commission.active {
+  background: rgba(255, 193, 7, 0.2);
+  border-color: rgba(255, 193, 7, 0.4);
+  color: #ffc107;
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.15);
+  animation: commissionActive 3s ease-in-out infinite;
 }
 
 .control-btn-more {
@@ -386,72 +539,101 @@ const handleImageError = (event: Event) => {
 
 .control-btn-more:hover:not(.disabled) {
   background: rgba(24, 144, 255, 0.25);
-  border-color: rgba(24, 144, 255, 0.4);
   color: #69c0ff;
-}
-
-.control-btn-commission {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-  transition: all 0.3s ease;
-}
-
-.control-btn-commission:hover:not(.disabled) {
-  background: rgba(255, 193, 7, 0.15);
-  border-color: rgba(255, 193, 7, 0.3);
-  color: #ffc107;
-}
-
-.control-btn-commission.active {
-  background: rgba(255, 193, 7, 0.2);
-  border-color: rgba(255, 193, 7, 0.5);
-  color: #ffc107;
-  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.25);
-}
-
-.control-btn-commission.active .btn-icon {
-  animation: commissionPulse 2s ease-in-out infinite;
 }
 
 .btn-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.3s ease;
+}
+
+.control-btn:hover:not(.disabled) .btn-icon {
+  transform: scale(1.1);
 }
 
 .btn-text {
-  font-size: 12px;    /* 🔥 增大字体 */
-  font-weight: 600;   /* 🔥 加粗 */
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
   line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-@keyframes indicatorPulse {
-  0% {
-    transform: scale(0.7);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+/* 🔥 指示器和徽章 */
+.bet-count-indicator {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #ff4d4f;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  border: 2px solid rgba(0, 0, 0, 0.8);
 }
 
-@keyframes commissionPulse {
+.last-bet-amount {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(82, 196, 26, 0.9);
+  color: white;
+  border-radius: 8px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.commission-status-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background: #52c41a;
+  border-radius: 50%;
+  animation: statusDotBlink 2s ease-in-out infinite;
+}
+
+/* 🔥 动画定义 */
+@keyframes undoGlow {
   0%, 100% {
-    transform: scale(1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
   }
   50% {
-    transform: scale(1.1);
+    box-shadow: 0 4px 20px rgba(24, 144, 255, 0.4);
   }
 }
 
-/* 响应式设计 */
+@keyframes commissionActive {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.3);
+  }
+}
+
+@keyframes statusDotBlink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* 🔥 响应式设计 - 保持原有断点 */
 @media (max-width: 768px) {
   .chip-display {
     padding: 10px 12px;

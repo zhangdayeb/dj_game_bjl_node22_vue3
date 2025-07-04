@@ -7,22 +7,12 @@
     </div>
 
     <!-- 筹码显示区域 -->
-    <ChipDisplay
-      :selectedChips="bettingStore.getDisplayChipsData || []"
-      :currentChip="bettingStore.selectedChip || 10"
-      :canUndo="canUndo"
-      :canRepeat="bettingStore.hasLastRoundData || false"
-      @chipSelect="handleChipSelect"
-      @undo="handleUndo"
-      @repeat="handleRepeat"
-      @more="handleMoreChips"
-    />
+    <ChipDisplay />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type CSSProperties } from 'vue'
-import { useBettingStore } from '@/stores/bettingStore'
+import { computed, type CSSProperties } from 'vue'
 
 // 组件导入
 import BettingAreaLayout from '@/components/BetArea/BettingAreaLayout.vue'
@@ -37,42 +27,6 @@ const props = withDefaults(defineProps<Props>(), {
   height: 400
 })
 
-// Emits
-const emit = defineEmits<{
-  chipSelect: [chipValue: number]
-  undo: []
-  repeat: []
-  moreChips: []
-}>()
-
-// Store
-let bettingStore: any = null
-
-try {
-  bettingStore = useBettingStore()
-} catch (error) {
-  console.error('❌ BettingStore 初始化失败:', error)
-  // 创建默认对象避免错误
-  bettingStore = {
-    selectedChip: 10,
-    getDisplayChipsData: [],
-    hasLastRoundData: false,
-    betHistory: [],
-    selectChip: () => {},
-    undoLastBet: () => {},
-    restoreLastRound: () => {}
-  }
-}
-
-// 计算属性
-const canUndo = computed(() => {
-  try {
-    return bettingStore?.betHistory?.length > 0 || false
-  } catch (error) {
-    return false
-  }
-})
-
 // 计算样式
 const middleSectionStyles = computed((): CSSProperties => ({
   height: `${props.height}px`,
@@ -84,42 +38,6 @@ const middleSectionStyles = computed((): CSSProperties => ({
   flex: 1,
   overflow: 'hidden'
 }))
-
-// 事件处理
-const handleChipSelect = (chipValue: number) => {
-  try {
-    bettingStore?.selectChip?.(chipValue)
-    console.log(`🎯 选择筹码: ${chipValue}`)
-    emit('chipSelect', chipValue)
-  } catch (error) {
-    console.error('❌ 选择筹码失败:', error)
-  }
-}
-
-const handleUndo = () => {
-  try {
-    bettingStore?.undoLastBet?.()
-    console.log('↩️ 执行撤销操作')
-    emit('undo')
-  } catch (error) {
-    console.error('❌ 撤销失败:', error)
-  }
-}
-
-const handleRepeat = () => {
-  try {
-    bettingStore?.restoreLastRound?.()
-    console.log('🔄 执行重复操作')
-    emit('repeat')
-  } catch (error) {
-    console.error('❌ 重复投注失败:', error)
-  }
-}
-
-const handleMoreChips = () => {
-  console.log('📱 打开筹码选择器')
-  emit('moreChips')
-}
 </script>
 
 <style scoped>

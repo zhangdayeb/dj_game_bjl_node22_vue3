@@ -5,7 +5,7 @@
     <div class="chip-selection-area">
       <div class="chip-items">
         <div
-          v-for="chip in selectedChips"
+          v-for="chip in displayChips"
           :key="chip.id"
           class="chip-item"
           :class="{ 'active': chip.value === currentChip }"
@@ -86,62 +86,89 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useBettingStore } from '@/stores/bettingStore'
 import type { ChipData } from '@/stores/bettingStore'
 
-// Props
-interface Props {
-  selectedChips: ChipData[]
-  currentChip: number
-  canUndo?: boolean
-  canRepeat?: boolean
-  defaultSelectedIndex?: number
+// Store
+let bettingStore: any = null
+
+try {
+  bettingStore = useBettingStore()
+} catch (error) {
+  console.error('❌ BettingStore 初始化失败:', error)
+  // 创建默认对象避免错误
+  bettingStore = {
+    selectedChip: 10,
+    getDisplayChipsData: [],
+    hasLastRoundData: false,
+    betHistory: [],
+    selectChip: () => {},
+    undoLastBet: () => {},
+    restoreLastRound: () => {}
+  }
 }
-
-const props = withDefaults(defineProps<Props>(), {
-  selectedChips: () => [],
-  currentChip: 10,
-  canUndo: false,
-  canRepeat: false,
-  defaultSelectedIndex: 0
-})
-
-// Emits
-const emit = defineEmits<{
-  chipSelect: [chipValue: number]
-  undo: []
-  repeat: []
-  more: []
-}>()
 
 // 计算属性
 const displayChips = computed(() => {
-  // 确保显示的筹码不为空
-  return props.selectedChips.length > 0 ? props.selectedChips : []
+  return bettingStore?.getDisplayChipsData || []
 })
 
-// 方法
+const currentChip = computed(() => {
+  return bettingStore?.selectedChip || 10
+})
+
+const canUndo = computed(() => {
+  try {
+    return bettingStore?.betHistory?.length > 0 || false
+  } catch (error) {
+    return false
+  }
+})
+
+const canRepeat = computed(() => {
+  try {
+    return bettingStore?.hasLastRoundData || false
+  } catch (error) {
+    return false
+  }
+})
+
+// 事件处理方法
 const handleChipSelect = (chip: ChipData) => {
-  emit('chipSelect', chip.value)
-  console.log(`🎯 选择筹码: ${chip.value}`)
+  try {
+    bettingStore?.selectChip?.(chip.value)
+    console.log(`🎯 选择筹码: ${chip.value}`)
+  } catch (error) {
+    console.error('❌ 选择筹码失败:', error)
+  }
 }
 
 const handleUndo = () => {
-  if (props.canUndo) {
-    emit('undo')
+  if (!canUndo.value) return
+
+  try {
+    bettingStore?.undoLastBet?.()
     console.log('↩️ 执行撤销操作')
+  } catch (error) {
+    console.error('❌ 撤销失败:', error)
   }
 }
 
 const handleRepeat = () => {
-  if (props.canRepeat) {
-    emit('repeat')
+  if (!canRepeat.value) return
+
+  try {
+    bettingStore?.restoreLastRound?.()
     console.log('🔄 执行重复操作')
+  } catch (error) {
+    console.error('❌ 重复投注失败:', error)
   }
 }
 
 const handleMore = () => {
-  emit('more')
   console.log('📱 打开筹码选择器')
+  // 这里可以添加打开筹码选择器的逻辑
+  // 比如触发全局事件或者直接操作某个状态
 }
 
 const handleImageError = (event: Event) => {

@@ -1,6 +1,7 @@
 <!-- src/components/BetArea/BetZones/BaseBetZone.vue -->
 <template>
   <div
+    ref="betZoneRef"
     class="bet-zone"
     :class="zoneClasses"
     :style="zoneStyles"
@@ -83,10 +84,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
 import type { BetZoneConfig } from '@/configs/betZoneConfigs'
 import { THEME_COLORS, LAYOUT_CONFIG } from '@/configs/betZoneConfigs'
+
+// 🔥 新增：导入音频服务
+import { useAudio } from '@/services/Audio'
 
 // 🔥 内部定义类型，避免导入复杂性
 type BaccaratBetType =
@@ -100,6 +104,12 @@ interface Props {
 
 const props = defineProps<Props>()
 const bettingStore = useBettingStore()
+
+// 🔥 新增：使用音频组合式函数
+const { playAudioFile } = useAudio()
+
+// 🔥 新增：组件引用
+const betZoneRef = ref<HTMLElement>()
 
 // 响应式状态
 const isWinning = ref(false)
@@ -187,8 +197,196 @@ const displayData = computed(() => {
   }
 })
 
+// 🔥 新增：播放音效的方法
+const playChipSound = async (): Promise<void> => {
+  try {
+    await playAudioFile('/src/assets/audio/chip.mp3', {
+      volume: 0.7, // 适中的音量
+    })
+  } catch (error) {
+    console.warn('播放筹码音效失败:', error)
+  }
+}
+
+// 🔥 新增：获取筹码选择器位置的方法
+const getChipSelectorPosition = (): { x: number; y: number } | null => {
+  try {
+    // 尝试多种可能的筹码选择器选择器
+    const possibleSelectors = [
+      '[class*="chip-selector"]',
+      '[class*="chip-area"]',
+      '[class*="betting-panel"]',
+      '.chip-container',
+      '.chips-panel',
+      // 根据图片推测可能的类名
+      '.betting-chips',
+      '.game-chips',
+      '[data-testid="chip-selector"]'
+    ]
+
+    let chipSelector: HTMLElement | null = null
+
+    for (const selector of possibleSelectors) {
+      chipSelector = document.querySelector(selector)
+      if (chipSelector) break
+    }
+
+    // 如果找不到筹码选择器，尝试查找包含数字10、50、100的元素
+    if (!chipSelector) {
+      const allElements = document.querySelectorAll('*')
+      for (const element of allElements) {
+        const text = element.textContent?.trim()
+        if (text && ['10', '50', '100'].includes(text)) {
+          const parent = element.closest('[class*="chip"]') || element.parentElement
+          if (parent && (parent as HTMLElement).offsetWidth > 0 && (parent as HTMLElement).offsetHeight > 0) {
+            chipSelector = parent as HTMLElement
+            break
+          }
+        }
+      }
+    }
+
+    // 如果还是找不到，使用屏幕底部中心作为默认位置
+    if (!chipSelector) {
+      console.warn('未找到筹码选择器，使用默认位置')
+      return {
+        x: window.innerWidth / 2,
+        y: window.innerHeight - 100
+      }
+    }
+
+    const rect = chipSelector.getBoundingClientRect()
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2
+    }
+  } catch (error) {
+    console.error('获取筹码选择器位置失败:', error)
+    return {
+      x: window.innerWidth / 2,
+      y: window.innerHeight - 100
+    }
+  }
+}
+
+// 🔥 新增：获取当前选中筹码信息的方法
+const getCurrentChipInfo = (): { value: number; image: string } => {
+  try {
+    // 尝试从 betting store 获取当前选中的筹码
+    const currentChipValue = (bettingStore as any).selectedChipValue ||
+                            (bettingStore as any).currentChipValue ||
+                            10
+
+    // 获取筹码图片，可能需要根据实际的 store 结构调整
+    const chipImage = (bettingStore as any).getChipImageByValue?.(currentChipValue) ||
+                     (bettingStore as any).chipImages?.[currentChipValue] ||
+                     `/src/assets/images/chips/chip-${currentChipValue}.png`
+
+    return {
+      value: currentChipValue,
+      image: chipImage
+    }
+  } catch (error) {
+    console.error('获取当前筹码信息失败:', error)
+    // 返回默认筹码信息
+    return {
+      value: 10,
+      image: '/src/assets/images/chips/chip-10.png'
+    }
+  }
+}
+
+// 🔥 新增：创建筹码飞行动画的方法
+const createChipFlyAnimation = async (): Promise<void> => {
+  try {
+    if (!betZoneRef.value) {
+      console.warn('投注区域引用不存在，跳过筹码飞行动画')
+      return
+    }
+
+    // 获取起点位置（筹码选择器）
+    const startPos = getChipSelectorPosition()
+    if (!startPos) {
+      console.warn('无法获取筹码选择器位置，跳过飞行动画')
+      return
+    }
+
+    // 获取终点位置（当前投注区域）
+    const targetRect = betZoneRef.value.getBoundingClientRect()
+    const endPos = {
+      x: targetRect.left + targetRect.width / 2,
+      y: targetRect.top + targetRect.height / 2
+    }
+
+    // 获取当前筹码信息
+    const chipInfo = getCurrentChipInfo()
+
+    // 创建飞行筹码元素
+    const flyingChip = document.createElement('div')
+    flyingChip.className = 'flying-chip'
+    flyingChip.innerHTML = `
+      <img
+        src="${chipInfo.image}"
+        alt="${chipInfo.value}筹码"
+        style="width: 45px; height: 45px; border-radius: 50%;"
+      />
+    `
+
+    // 设置初始样式
+    Object.assign(flyingChip.style, {
+      position: 'fixed',
+      left: `${startPos.x - 22.5}px`, // 居中对齐
+      top: `${startPos.y - 22.5}px`,
+      zIndex: '9999',
+      pointerEvents: 'none',
+      transition: 'all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)', // 平滑的缓动函数
+      transform: 'scale(1)',
+      opacity: '1'
+    })
+
+    // 添加到页面
+    document.body.appendChild(flyingChip)
+
+    // 等待一帧确保元素已渲染
+    await nextTick()
+
+    // 开始飞行动画
+    requestAnimationFrame(() => {
+      Object.assign(flyingChip.style, {
+        left: `${endPos.x - 22.5}px`,
+        top: `${endPos.y - 22.5}px`,
+        transform: 'scale(0.8)', // 飞行过程中稍微缩小
+      })
+    })
+
+    // 动画完成后清理
+    setTimeout(() => {
+      // 添加消失效果
+      Object.assign(flyingChip.style, {
+        transform: 'scale(0)',
+        opacity: '0',
+        transition: 'all 0.2s ease-in'
+      })
+
+      // 完全移除元素
+      setTimeout(() => {
+        if (flyingChip.parentNode) {
+          flyingChip.parentNode.removeChild(flyingChip)
+        }
+      }, 200)
+    }, 600) // 飞行动画时长
+
+  } catch (error) {
+    console.error('创建筹码飞行动画失败:', error)
+  }
+}
+
 // 🎯 交互方法
-const handleBetClick = () => {
+const handleBetClick = async () => {
+  // 🔥 新增：并行执行音效和飞行动画
+  const audioPromise = playChipSound()
+  const animationPromise = createChipFlyAnimation()
+
   // 🔥 类型安全的投注调用
   try {
     const result = bettingStore.placeBet?.(props.config.id as BaccaratBetType)
@@ -208,6 +406,13 @@ const handleBetClick = () => {
   } catch (error) {
     console.error('投注错误:', error)
     showStatusMessage('投注系统错误', 'error')
+  }
+
+  // 🔥 等待音效和动画完成（不阻塞投注逻辑）
+  try {
+    await Promise.all([audioPromise, animationPromise])
+  } catch (error) {
+    console.warn('音效或动画执行失败:', error)
   }
 }
 
@@ -508,6 +713,20 @@ defineExpose({
 .chip-image {
   animation: chipStack 0.3s ease-out;
   animation-fill-mode: both;
+}
+
+/* 🔥 新增：飞行筹码的全局样式 */
+:global(.flying-chip) {
+  pointer-events: none;
+  z-index: 9999;
+}
+
+:global(.flying-chip img) {
+  display: block;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.3),
+    0 0 0 2px rgba(255, 255, 255, 0.2);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 /* 🏆 效果样式 */

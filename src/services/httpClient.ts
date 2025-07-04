@@ -31,7 +31,7 @@ const getEnvVar = (key: string, defaultValue: string = ''): string => {
 
 // 默认配置
 const defaultConfig: HttpConfig = {
-  baseURL: getEnvVar('VITE_API_BASE_URL', 'https://bjlapi.oyfeit8.com'),
+  baseURL: getEnvVar('VITE_API_BASE_URL', 'https://bjlapi.ampj998.top'),
   timeout: 10000
 }
 

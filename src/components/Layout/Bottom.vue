@@ -32,7 +32,7 @@ const gameParams = getGameParams()
 
 // 从环境变量获取路珠基础URL
 const getLzBaseUrl = (): string => {
-  return import.meta.env.VITE_LZ_URL || 'https://lzh5bjl.oyfeit8.com/zh/bjl_xc_big_678.html'
+  return import.meta.env.VITE_LZ_URL || 'https://lzh5bjl.ampj998.top/zh/bjl_xc_big_678.html'
 }
 
 // 计算路珠URL

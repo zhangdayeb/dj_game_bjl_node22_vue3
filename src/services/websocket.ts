@@ -39,7 +39,7 @@ export class SimpleWebSocketService {
 
   private constructor() {
     this.config = {
-      url: import.meta.env.VITE_WS_URL || 'wss://wssbjl.oyfeit8.com',
+      url: import.meta.env.VITE_WS_URL || 'wss://wssbjl.ampj998.top',
       heartbeatInterval: 30000,    // 30秒心跳
       reconnectAttempts: 5,        // 重连5次
       reconnectDelay: 5000,        // 5秒间隔

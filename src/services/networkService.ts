@@ -8,6 +8,31 @@ import type { GameParams } from '@/utils/urlParams'
 import type { GameStatus } from '@/types/game'
 import type { TableInfo, UserInfo } from '@/services/gameApi'
 
+  /**
+   * 构建视频URL - 将tableId附加到tableVideo参数
+   * @param {string} baseVideoUrl - 基础视频URL
+   * @param {string|number} tableId - 桌台ID
+   * @returns {string} - 完整的视频URL
+   */
+  function buildVideoUrl(baseVideoUrl: string, tableId: string | number): string {
+    try {
+      const url = new URL(baseVideoUrl)
+      const tableVideo = url.searchParams.get('tableVideo')
+
+      if (tableVideo) {
+        // 将tableId附加到tableVideo参数后面
+        const newTableVideo = tableVideo + tableId
+        url.searchParams.set('tableVideo', newTableVideo)
+        return url.toString()
+      }
+
+      return baseVideoUrl
+    } catch (error) {
+      console.error('构建视频URL时出错:', error)
+      return baseVideoUrl
+    }
+  }
+
 // 网络状态接口
 interface NetworkStatus {
   isOnline: boolean
@@ -374,11 +399,13 @@ async function loadInitialData(): Promise<void> {
     if (tableInfo) {
       gameData.tableInfo = tableInfo
 
-      // 设置视频地址（只设置一次）
+      // 🔥 修改：设置视频地址时构建包含tableId的URL
+      const tableId = tableInfo.id || gameData.gameParams.table_id
+
       if (tableInfo.video_near) {
-        gameData.videoUrl = tableInfo.video_near
+        gameData.videoUrl = buildVideoUrl(tableInfo.video_near, tableId)
       } else if (tableInfo.video_far) {
-        gameData.videoUrl = tableInfo.video_far
+        gameData.videoUrl = buildVideoUrl(tableInfo.video_far, tableId)
       }
 
       // 解析游戏状态
@@ -393,7 +420,7 @@ async function loadInitialData(): Promise<void> {
       status: gameData.gameStatus,
       countdown: gameData.countdown,
       gameNumber: gameData.gameNumber,
-      videoUrl: gameData.videoUrl ? '已获取' : '未获取'
+      videoUrl: gameData.videoUrl
     })
 
   } catch (error) {

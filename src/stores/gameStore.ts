@@ -149,6 +149,25 @@ export const useGameStore = defineStore('game', {
       this.isConnected = connected
     },
 
+    // 构建带tableId的视频URL
+    buildVideoUrlWithTableId(baseUrl: string, tableId: string | number): string {
+      try {
+        const url = new URL(baseUrl)
+        const tableVideo = url.searchParams.get('tableVideo')
+
+        if (tableVideo) {
+          const newTableVideo = tableVideo + tableId
+          url.searchParams.set('tableVideo', newTableVideo)
+          return url.toString()
+        }
+
+        return baseUrl
+      } catch (error) {
+        console.error('构建视频URL失败:', error)
+        return baseUrl
+      }
+    },
+
     // 初始化
     init() {
       console.log('🎮 游戏 Store 初始化')

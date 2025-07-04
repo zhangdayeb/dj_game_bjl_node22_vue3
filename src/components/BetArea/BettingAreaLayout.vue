@@ -88,7 +88,12 @@ const selectedChip = computed((): number => bettingStore.selectedChip)
 const lastBets = computed((): Record<string, number> => bettingStore.lastBets)
 
 // 方法
-const formatAmount = (amount: number): string => {
+const formatAmount = (amount: number | undefined | null): string => {
+  // 参数验证和默认值处理
+  if (amount === undefined || amount === null || isNaN(amount)) {
+    return '0'  // 或者返回 '---' 或其他默认显示
+  }
+
   return amount.toLocaleString()
 }
 

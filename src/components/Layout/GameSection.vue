@@ -16,9 +16,9 @@
       <!-- 浮动UI层 -->
       <div class="floating-ui-layer">
         <UserBalance />
-        <RoundNumber />
+        <RoundNumber :roundNumber="gameState.gameNumber" />
         <GameStatus />
-        <Countdown @countdownChange="handleCountdownChange" />
+        <Countdown :countdown="gameState.countdown" @countdownChange="handleCountdownChange" />
         <SettingsBtn @click="showSettings = true" />
       </div>
     </div>
@@ -79,6 +79,7 @@ import ResultEffect from '@/components/Effects/ResultEffect.vue'
 import WinningEffect from '@/components/Effects/WinningEffect.vue'
 
 // 浮动UI组件
+import GameHeader from '@/components/FloatingUI/GameHeader.vue'
 import UserBalance from '@/components/FloatingUI/UserBalance.vue'
 import RoundNumber from '@/components/FloatingUI/RoundNumber.vue'
 import GameStatus from '@/components/FloatingUI/GameStatus.vue'
@@ -119,6 +120,13 @@ const showWinningEffect = ref(false)
 // 视频URL
 const videoUrl = ref('https://example.com/live-stream.m3u8')
 const roadmapUrl = ref('https://example.com/roadmap')
+
+// 游戏状态
+const gameState = reactive({
+  gameNumber: 'T2501040001',
+  countdown: 0,
+  phase: 'waiting' as 'waiting' | 'betting' | 'dealing' | 'result'
+})
 
 // 获取真实视口高度
 const getRealViewportHeight = () => {

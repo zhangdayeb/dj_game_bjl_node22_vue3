@@ -2,6 +2,7 @@
 import './assets/css/main.css'
 
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 import App from './App.vue'
 
 // 🎨 Naive UI 按需导入（推荐）
@@ -33,6 +34,12 @@ import naive from 'naive-ui'
 // 🔥 创建 Vue 应用实例
 const app = createApp(App)
 
+// 🍍 创建 Pinia 实例
+const pinia = createPinia()
+
+// 🍍 注册 Pinia（必须在其他插件之前）
+app.use(pinia)
+
 // 🎨 注册 Naive UI
 app.use(naive)
 
@@ -59,4 +66,5 @@ if (import.meta.env.DEV) {
   console.log('🚀 开发环境已启动')
   console.log('🔧 API Base URL:', import.meta.env.VITE_API_BASE_URL)
   console.log('🔧 WebSocket URL:', import.meta.env.VITE_WS_URL)
+  console.log('🍍 Pinia 状态管理已启用')
 }

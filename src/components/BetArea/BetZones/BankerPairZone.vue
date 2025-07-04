@@ -266,8 +266,8 @@ const showLoseAnimation = () => {
 }
 
 .chip-image {
-  width: 16px;
-  height: 16px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -379,8 +379,8 @@ const showLoseAnimation = () => {
   }
 
   .chip-image {
-    width: 14px;
-    height: 14px;
+    width: 40px;
+    height: 40px;
   }
 }
 
@@ -403,8 +403,8 @@ const showLoseAnimation = () => {
   }
 
   .chip-image {
-    width: 12px;
-    height: 12px;
+    width: 40px;
+    height: 40px;
   }
 }
 </style>

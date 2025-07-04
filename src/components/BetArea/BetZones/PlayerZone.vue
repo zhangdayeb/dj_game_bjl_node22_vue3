@@ -305,8 +305,8 @@ const showLoseAnimation = () => {
 }
 
 .chip-image {
-  width: 20px; /* 🔥 减小筹码图片尺寸 */
-  height: 20px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -424,8 +424,8 @@ const showLoseAnimation = () => {
   }
 
   .chip-image {
-    width: 18px;
-    height: 18px;
+    width: 60px;
+    height: 60px;
   }
 }
 
@@ -454,8 +454,8 @@ const showLoseAnimation = () => {
   }
 
   .chip-image {
-    width: 16px;
-    height: 16px;
+    width: 60px;
+    height: 60px;
   }
 
   .bet-status-indicator {
@@ -488,8 +488,8 @@ const showLoseAnimation = () => {
   }
 
   .chip-image {
-    width: 14px;
-    height: 14px;
+    width: 60px;
+    height: 60px;
   }
 }
 </style>

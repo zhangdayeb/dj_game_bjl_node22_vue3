@@ -1,4 +1,4 @@
-<!-- src/components/BetArea/ChipDisplay.vue - 优化版：保持原布局+增强效果 -->
+<!-- src/components/BetArea/ChipDisplay.vue - 修复版：统一使用 uiStore -->
 <template>
   <div class="chip-display">
     <!-- 🔥 保持原始横向布局，只增强效果 -->
@@ -49,7 +49,6 @@
             'active': chip.value === currentChip
           }"
           @click="handleChipSelect(chip)"
-
         >
           <div class="chip-image-container">
             <img
@@ -58,13 +57,6 @@
               class="chip-image"
               @error="handleImageError"
             />
-
-            <!-- 🔥 去掉余额不足遮罩 -->
-            <!-- <div class="insufficient-overlay" v-if="!isAffordable(chip.value)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-              </svg>
-            </div> -->
           </div>
           <div class="chip-info">
             <span class="chip-value">{{ formatChipValue(chip.value) }}</span>
@@ -89,7 +81,7 @@
         <div class="commission-status-dot" v-if="isCommissionFree"></div>
       </button>
 
-      <!-- 更多按钮 -->
+      <!-- 🔥 更多按钮 - 使用 uiStore -->
       <button
         class="control-btn control-btn-more"
         @click="handleMore"
@@ -103,28 +95,14 @@
         <span class="btn-text">更多</span>
       </button>
     </div>
-
-    <!-- 🔥 去掉余额不足全局提示 -->
-    <!-- <div class="balance-warning" v-if="!isAffordable(currentChip)">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
-      </svg>
-      <span>余额不足，请选择较小面额筹码</span>
-    </div> -->
-
-    <!-- 🔥 筹码选择器弹窗 -->
-    <ChipSelector
-      v-if="showChipSelector"
-      @close="showChipSelector = false"
-      @select="handleChipSelectorSelect"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
-import ChipSelector from '@/components/Panels/ChipSelector.vue'
+import { useUIStore } from '@/stores/uiStore'
+
 // 🔥 ChipData 类型定义
 interface ChipData {
   id: string | number
@@ -143,16 +121,15 @@ const props = withDefaults(defineProps<Props>(), {
   chipCount: 3
 })
 
-// 响应式状态
-const showChipSelector = ref(false)
-
-// Store
+// 🔥 引入 Stores
 let bettingStore: any = null
+let uiStore: any = null
 
 try {
   bettingStore = useBettingStore()
+  uiStore = useUIStore() // 🔥 新增：使用 uiStore
 } catch (error) {
-  console.error('❌ BettingStore 初始化失败:', error)
+  console.error('❌ Store 初始化失败:', error)
   // 创建默认对象避免错误
   bettingStore = {
     selectedChip: 10,
@@ -170,6 +147,10 @@ try {
     rebet: () => {},
     toggleCommissionFree: () => {}
   }
+  uiStore = {
+    openChipSelector: () => {},
+    closeChipSelector: () => {}
+  }
 }
 
 // 🔥 默认筹码数据
@@ -179,21 +160,21 @@ const defaultChipsData: ChipData[] = [
     value: 10,
     name: '10元',
     displayValue: '10',
-    image: '/src/assets/images/chips/chip-10.png'
+    image: '/src/assets/images/chips/B_10.png'
   },
   {
     id: 2,
     value: 50,
     name: '50元',
     displayValue: '50',
-    image: '/src/assets/images/chips/chip-50.png'
+    image: '/src/assets/images/chips/B_50.png'
   },
   {
     id: 3,
     value: 100,
     name: '100元',
     displayValue: '100',
-    image: '/src/assets/images/chips/chip-100.png'
+    image: '/src/assets/images/chips/B_100.png'
   }
 ]
 
@@ -269,11 +250,6 @@ const lastBetAmount = computed(() => {
 })
 
 // 方法
-const isAffordable = (chipValue: number): boolean => {
-  // 🔥 去掉余额限制，任何筹码都可以选择
-  return true
-}
-
 const formatChipValue = (value: number): string => {
   if (value >= 1000) {
     return `${(value / 1000).toFixed(0)}K`
@@ -287,10 +263,14 @@ const formatAmount = (amount: number): string => {
 
 // 事件处理方法
 const handleChipSelect = (chip: ChipData) => {
-  // 🔥 去掉余额检查，直接选择筹码
   try {
     bettingStore?.selectChip?.(chip.value)
     console.log(`🎯 选择筹码: ${chip.value}`)
+
+    // 🔥 添加触觉反馈
+    if (navigator.vibrate) {
+      navigator.vibrate(30)
+    }
   } catch (error) {
     console.error('❌ 选择筹码失败:', error)
   }
@@ -327,14 +307,19 @@ const handleCommissionToggle = () => {
   }
 }
 
+// 🔥 修复：使用 uiStore 打开筹码选择器
 const handleMore = () => {
-  showChipSelector.value = true
-  console.log('📱 打开筹码选择器')
-}
+  try {
+    uiStore?.openChipSelector?.()
+    console.log('📱 打开筹码选择器 [通过 uiStore]')
 
-const handleChipSelectorSelect = (chip: ChipData) => {
-  handleChipSelect(chip)
-  showChipSelector.value = false
+    // 添加触觉反馈
+    if (navigator.vibrate) {
+      navigator.vibrate(50)
+    }
+  } catch (error) {
+    console.error('❌ 打开筹码选择器失败:', error)
+  }
 }
 
 const handleImageError = (event: Event) => {
@@ -345,10 +330,11 @@ const handleImageError = (event: Event) => {
 
 // 生命周期
 onMounted(() => {
-  console.log('🎰 筹码显示组件挂载 [优化版]', {
+  console.log('🎰 筹码显示组件挂载 [uiStore版]', {
     selectedChip: currentChip.value,
     balance: availableBalance.value,
-    displayChipsCount: displayChips.value.length
+    displayChipsCount: displayChips.value.length,
+    hasUIStore: !!uiStore
   })
 })
 </script>
@@ -531,6 +517,7 @@ onMounted(() => {
   animation: commissionActive 3s ease-in-out infinite;
 }
 
+/* 🔥 更多按钮特殊样式 */
 .control-btn-more {
   background: rgba(24, 144, 255, 0.12);
   border-color: rgba(24, 144, 255, 0.25);
@@ -540,6 +527,7 @@ onMounted(() => {
 .control-btn-more:hover:not(.disabled) {
   background: rgba(24, 144, 255, 0.25);
   color: #69c0ff;
+  box-shadow: 0 6px 20px rgba(24, 144, 255, 0.3);
 }
 
 .btn-icon {

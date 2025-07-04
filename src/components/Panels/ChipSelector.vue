@@ -1,7 +1,7 @@
 <template>
-  <!-- 全屏筹码选择器遮罩层 -->
+  <!-- 🔥 使用 uiStore 的显示状态 -->
   <div
-    v-if="visible"
+    v-if="uiStore.showChipSelector"
     class="chip-selector-overlay"
     @click="handleOverlayClick"
   >
@@ -25,81 +25,44 @@
 
       <!-- 面板内容 -->
       <div class="panel-content">
-        <!-- 当前选择显示 -->
+        <!-- 🔥 当前选中的3个筹码显示 -->
         <div class="current-selection">
           <div class="selection-info">
-            <span class="selection-label">当前选择:</span>
-            <div class="selected-chip-display">
-              <template v-if="selectedChip">
-                <img
-                  :src="selectedChip.image"
-                  :alt="selectedChip.name"
-                  class="selected-chip-image"
-                  @error="handleImageError"
-                />
-                <div class="selected-chip-info">
-                  <span class="chip-value">${{ selectedChip.displayValue }}</span>
-                  <span class="chip-name">{{ selectedChip.name }}</span>
-                </div>
-              </template>
-              <template v-else>
-                <span class="no-selection">请选择筹码</span>
-              </template>
-            </div>
-          </div>
-          <div class="balance-info">
-            <span class="balance-label">可用余额:</span>
-            <span class="balance-amount">${{ formatAmount(currentBalance) }}</span>
-          </div>
-        </div>
-
-        <!-- 默认筹码选择（3个推荐筹码） -->
-        <div class="default-chips-section">
-          <h3 class="section-title">推荐筹码</h3>
-          <div class="default-chips-grid">
-            <div
-              v-for="chip in defaultChips"
-              :key="chip.id"
-              class="chip-item"
-              :class="{
-                'active': selectedChip?.id === chip.id,
-                'disabled': !isAffordable(chip.value)
-              }"
-              @click="selectChip(chip)"
-            >
-              <div class="chip-image-container">
+            <span class="selection-label">当前选中筹码:</span>
+            <div class="selected-chips-display">
+              <div
+                v-for="chip in selectedDisplayChips"
+                :key="chip.id"
+                class="selected-chip-item"
+              >
                 <img
                   :src="chip.image"
                   :alt="chip.name"
-                  class="chip-image"
+                  class="selected-chip-image"
                   @error="handleImageError"
                 />
-                <div class="chip-glow" :style="{ backgroundColor: getChipColor(chip.value) }"></div>
-              </div>
-              <div class="chip-label">
                 <span class="chip-value">${{ chip.displayValue }}</span>
-                <span class="chip-name">{{ chip.name }}</span>
               </div>
-              <div v-if="!isAffordable(chip.value)" class="insufficient-badge">
-                余额不足
+              <div v-if="selectedDisplayChips.length === 0" class="no-selection">
+                未选择任何筹码
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 所有筹码选择 -->
-        <div class="all-chips-section">
-          <h3 class="section-title">所有筹码</h3>
+        <!-- 筹码选择 -->
+        <div class="chips-section">
+          <h3 class="section-title">选择筹码</h3>
           <div class="chips-grid">
             <div
               v-for="chip in availableChips"
               :key="chip.id"
-              class="chip-item small"
+              class="chip-item"
               :class="{
-                'active': selectedChip?.id === chip.id,
+                'active': selectedDisplayChips.some(sc => sc.id === chip.id),
                 'disabled': !isAffordable(chip.value)
               }"
-              @click="selectChip(chip)"
+              @click="toggleChipSelection(chip)"
             >
               <div class="chip-image-container">
                 <img
@@ -115,6 +78,12 @@
               </div>
               <div v-if="!isAffordable(chip.value)" class="insufficient-badge">
                 余额不足
+              </div>
+              <!-- 🔥 选中状态指示器 -->
+              <div v-if="selectedDisplayChips.some(sc => sc.id === chip.id)" class="selected-indicator">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
               </div>
             </div>
           </div>
@@ -129,10 +98,10 @@
           </button>
           <button
             class="btn btn-primary"
-            :disabled="!selectedChip"
+            :disabled="selectedDisplayChips.length === 0"
             @click="confirmSelection"
           >
-            确认选择
+            确认选择 ({{ selectedDisplayChips.length }}/3)
           </button>
         </div>
       </div>
@@ -143,6 +112,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
+import { useUIStore } from '@/stores/uiStore'
 
 // 类型定义
 interface ChipData {
@@ -153,26 +123,12 @@ interface ChipData {
   displayValue: string
 }
 
-// Props
-interface Props {
-  visible?: boolean
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  visible: false
-})
-
-// 事件定义
-const emit = defineEmits<{
-  close: []
-  chipSelect: [chip: ChipData]
-}>()
-
-// Store
+// 🔥 引入 Stores
 const bettingStore = useBettingStore()
+const uiStore = useUIStore()
 
-// 响应式数据
-const selectedChip = ref<ChipData | null>(null)
+// 🔥 响应式数据 - 改为多选
+const selectedDisplayChips = ref<ChipData[]>([])
 
 // 计算属性
 const currentBalance = computed(() => {
@@ -246,14 +202,30 @@ const getChipColor = (value: number): string => {
   return '#95a5a6' // 灰色 - 小额
 }
 
-const selectChip = (chip: ChipData) => {
+// 🔥 切换筹码选择（最多3个）
+const toggleChipSelection = (chip: ChipData) => {
   if (!isAffordable(chip.value)) {
     console.log('💰 余额不足，无法选择此筹码')
     return
   }
 
-  selectedChip.value = chip
-  console.log('🎰 选择筹码:', chip)
+  const index = selectedDisplayChips.value.findIndex(sc => sc.id === chip.id)
+
+  if (index >= 0) {
+    // 如果已选中，则取消选择
+    selectedDisplayChips.value.splice(index, 1)
+    console.log('➖ 取消选择筹码:', chip.value)
+  } else {
+    // 如果未选中，检查是否已达到最大数量
+    if (selectedDisplayChips.value.length >= 3) {
+      console.log('⚠️ 最多只能选择3个筹码')
+      return
+    }
+
+    // 添加到选择列表
+    selectedDisplayChips.value.push(chip)
+    console.log('➕ 选择筹码:', chip.value)
+  }
 
   // 添加触觉反馈
   if (navigator.vibrate) {
@@ -261,29 +233,47 @@ const selectChip = (chip: ChipData) => {
   }
 }
 
+// 🔥 确认选择 - 更新 bettingStore 的显示筹码并关闭面板
 const confirmSelection = () => {
-  if (selectedChip.value) {
-    // 更新 bettingStore 的选中筹码
-    if (bettingStore?.selectChip) {
-      bettingStore.selectChip(selectedChip.value.value)
-    }
+  if (selectedDisplayChips.value.length > 0) {
+    try {
+      // 🔥 更新 bettingStore 的显示筹码列表（如果有相关方法）
+      if (bettingStore?.updateDisplayChips) {
+        bettingStore.updateDisplayChips(selectedDisplayChips.value)
+      }
 
-    emit('chipSelect', selectedChip.value)
-    console.log('✅ 确认选择筹码:', selectedChip.value)
+      // 🔥 如果选择了筹码，将第一个设为当前选中筹码
+      if (bettingStore?.selectChip && selectedDisplayChips.value[0]) {
+        bettingStore.selectChip(selectedDisplayChips.value[0].value)
+      }
 
-    // 添加成功反馈
-    if (navigator.vibrate) {
-      navigator.vibrate([50, 50, 50])
+      console.log('✅ 确认选择筹码:', selectedDisplayChips.value.map(c => c.value))
+
+      // 🔥 关闭筹码选择器
+      handleClose()
+
+      // 添加成功反馈
+      if (navigator.vibrate) {
+        navigator.vibrate([50, 50, 50])
+      }
+    } catch (error) {
+      console.error('❌ 确认选择筹码失败:', error)
     }
   }
 }
 
+// 🔥 使用 uiStore 关闭面板
 const handleClose = () => {
-  emit('close')
+  try {
+    uiStore?.closeChipSelector?.()
+    console.log('🔥 关闭筹码选择器 [通过 uiStore]')
+  } catch (error) {
+    console.error('❌ 关闭筹码选择器失败:', error)
+  }
 }
 
 const handleOverlayClick = () => {
-  emit('close')
+  handleClose()
 }
 
 const handleImageError = (event: Event) => {
@@ -293,30 +283,38 @@ const handleImageError = (event: Event) => {
   console.warn('⚠️ 筹码图片加载失败:', img.alt)
 }
 
-// 监听可见性变化，自动选择当前筹码
-watch(() => props.visible, (newVisible) => {
+// 🔥 监听面板显示状态，自动选择当前显示的筹码
+watch(() => uiStore.showChipSelector, (newVisible) => {
   if (newVisible) {
-    // 打开时，自动选择当前使用的筹码
-    const currentSelectedValue = bettingStore?.selectedChip || 10
-    const currentChip = availableChips.value.find(chip => chip.value === currentSelectedValue)
+    // 打开时，获取当前显示的筹码列表
+    const currentDisplayChips = bettingStore?.getDisplayChipsData || []
 
-    if (currentChip && isAffordable(currentChip.value)) {
-      selectedChip.value = currentChip
+    if (currentDisplayChips.length > 0) {
+      // 选择当前显示的筹码
+      selectedDisplayChips.value = [...currentDisplayChips].slice(0, 3)
+      console.log('🎯 自动选择当前显示筹码:', selectedDisplayChips.value.map(c => c.value))
     } else {
-      // 如果当前筹码不可用，选择第一个默认筹码
-      if (defaultChips.value.length > 0) {
-        selectedChip.value = defaultChips.value[0]
-      }
+      // 如果没有显示筹码，选择默认的3个筹码
+      const defaultSelection = availableChips.value
+        .filter(chip => isAffordable(chip.value))
+        .slice(0, 3)
+      selectedDisplayChips.value = defaultSelection
+      console.log('🎯 选择默认筹码:', selectedDisplayChips.value.map(c => c.value))
     }
+  } else {
+    // 关闭时重置选择
+    selectedDisplayChips.value = []
   }
 })
 
 // 生命周期
 onMounted(() => {
-  console.log('🎰 筹码选择器组件挂载 [全屏版]', {
+  console.log('🎰 筹码选择器组件挂载 [uiStore版]', {
     balance: currentBalance.value,
     availableChipsCount: availableChips.value.length,
-    defaultChipsCount: defaultChips.value.length
+    defaultChipsCount: defaultChips.value.length,
+    hasUIStore: !!uiStore,
+    hasBettingStore: !!bettingStore
   })
 })
 </script>
@@ -431,24 +429,19 @@ onMounted(() => {
   border-radius: 3px;
 }
 
-/* 当前选择区域 */
+/* 🔥 当前选中的筹码显示区域 */
 .current-selection {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
 }
 
 .selection-info {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .selection-label {
@@ -457,57 +450,43 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.selected-chip-display {
+.selected-chips-display {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.selected-chip-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(24, 144, 255, 0.1);
+  border: 1px solid rgba(24, 144, 255, 0.3);
+  border-radius: 12px;
+  min-width: 60px;
 }
 
 .selected-chip-image {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
 }
 
-.selected-chip-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.chip-value {
-  color: white;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.chip-name {
-  color: rgba(255, 255, 255, 0.6);
+.selected-chip-item .chip-value {
+  color: #69c0ff;
   font-size: 12px;
+  font-weight: 600;
 }
 
 .no-selection {
   color: rgba(255, 255, 255, 0.5);
   font-style: italic;
-}
-
-.balance-info {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-}
-
-.balance-label {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 12px;
-}
-
-.balance-amount {
-  color: #52c41a;
-  font-size: 16px;
-  font-weight: 600;
+  padding: 20px;
+  text-align: center;
 }
 
 /* 🔥 节标题 */
@@ -520,20 +499,8 @@ onMounted(() => {
   border-left: 3px solid #1890ff;
 }
 
-/* 🔥 默认筹码区域（3个推荐） */
-.default-chips-section {
-  margin-bottom: 32px;
-}
-
-.default-chips-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 8px;
-}
-
-/* 🔥 所有筹码区域 */
-.all-chips-section {
+/* 🔥 筹码选择区域 */
+.chips-section {
   margin-bottom: 16px;
 }
 
@@ -555,13 +522,8 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.03);
   border: 2px solid rgba(255, 255, 255, 0.08);
   position: relative;
-  min-height: 120px;
-  justify-content: center;
-}
-
-.chip-item.small {
   min-height: 100px;
-  padding: 12px 8px;
+  justify-content: center;
 }
 
 .chip-item:hover:not(.disabled) {
@@ -592,18 +554,13 @@ onMounted(() => {
 }
 
 .chip-image {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   object-fit: contain;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
   transition: all 0.3s ease;
   position: relative;
   z-index: 2;
-}
-
-.chip-item.small .chip-image {
-  width: 48px;
-  height: 48px;
 }
 
 /* 🔥 筹码发光效果 */
@@ -612,8 +569,8 @@ onMounted(() => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 70px;
-  height: 70px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   opacity: 0;
   filter: blur(15px);
@@ -626,11 +583,6 @@ onMounted(() => {
   opacity: 0.4;
 }
 
-.chip-item.small .chip-glow {
-  width: 60px;
-  height: 60px;
-}
-
 .chip-label {
   display: flex;
   flex-direction: column;
@@ -641,17 +593,24 @@ onMounted(() => {
 
 .chip-label .chip-value {
   color: white;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
 }
 
-.chip-item.small .chip-label .chip-value {
-  font-size: 14px;
-}
-
-.chip-label .chip-name {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 12px;
+/* 🔥 选中状态指示器 */
+.selected-indicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  background: #1890ff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.4);
 }
 
 .insufficient-badge {
@@ -755,24 +714,26 @@ onMounted(() => {
     padding: 20px;
   }
 
-  .default-chips-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-
   .chips-grid {
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
     gap: 10px;
   }
 
   .current-selection {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+    padding: 16px;
   }
 
-  .balance-info {
-    align-items: flex-start;
+  .selected-chips-display {
+    gap: 8px;
+  }
+
+  .selected-chip-item {
+    min-width: 50px;
+  }
+
+  .selected-chip-image {
+    width: 32px;
+    height: 32px;
   }
 }
 
@@ -795,4 +756,10 @@ onMounted(() => {
     width: 50px !important;
     height: 50px !important;
   }
-}</style>
+
+  .selected-chip-image {
+    width: 28px;
+    height: 28px;
+  }
+}
+</style>

@@ -65,14 +65,14 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useBettingStore } from '@/stores/bettingStore'
-import BankerPairZone from './BankerPairZone.vue'
-import BankerZone from './BankerZone.vue'
-import TieZone from './TieZone.vue'
-import PlayerZone from './PlayerZone.vue'
-import PlayerPairZone from './PlayerPairZone.vue'
-import Dragon7Zone from './Dragon7Zone.vue'
-import Lucky6Zone from './Lucky6Zone.vue'
-import Panda8Zone from './Panda8Zone.vue'
+import BankerPairZone from './BetZones/BankerPairZone.vue'
+import BankerZone from './BetZones/BankerZone.vue'
+import TieZone from './BetZones/TieZone.vue'
+import PlayerZone from './BetZones/PlayerZone.vue'
+import PlayerPairZone from './BetZones/PlayerPairZone.vue'
+import Dragon7Zone from './BetZones/Dragon7Zone.vue'
+import Lucky6Zone from './BetZones/Lucky6Zone.vue'
+import Panda8Zone from './BetZones/Panda8Zone.vue'
 
 const bettingStore = useBettingStore()
 

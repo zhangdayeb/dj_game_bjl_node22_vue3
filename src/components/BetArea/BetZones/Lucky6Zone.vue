@@ -4,7 +4,8 @@
     :class="{
       'active': hasActiveBet,
       'winning': isWinning,
-      'losing': isLosing
+      'losing': isLosing,
+      'blinking': isBlinking
     }"
     @click="handleBetClick"
   >
@@ -29,7 +30,7 @@
           v-for="(chip, index) in chipImages"
           :key="index"
           :src="chip.image"
-          :alt="`${chip.value}元筹码`"
+          :alt="`${chip.value}筹码`"
           class="chip-image"
           :style="{
             zIndex: index + 1,
@@ -76,6 +77,11 @@ const hasActiveBet = computed(() => {
   return betAmount.value > 0
 })
 
+// 🔥 新增：闪烁状态
+const isBlinking = computed(() => {
+  return bettingStore.isZoneBlinking(ZONE_ID)
+})
+
 // 获取筹码图片 - 使用公共方法
 const chipImages = computed(() => {
   return bettingStore.getChipImages(betAmount.value)
@@ -95,7 +101,7 @@ const handleBetClick = () => {
       navigator.vibrate(50)
     }
 
-    // 点击动画
+    // 简化点击动画
     animateClick()
   } else {
     console.log('幸运6投注失败:', result.message)
@@ -109,7 +115,7 @@ const animateClick = () => {
     element.classList.add('clicked')
     setTimeout(() => {
       element.classList.remove('clicked')
-    }, 200)
+    }, 150)
   }
 }
 
@@ -145,7 +151,7 @@ const showLoseAnimation = () => {
 </script>
 
 <style scoped>
-/* 第一排边注区域样式 - 紫色 */
+/* 🔥 简化第一排边注区域样式 - 紫色 */
 .first-row-zone {
   position: relative;
   background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%);
@@ -163,16 +169,16 @@ const showLoseAnimation = () => {
   height: 100%;
 }
 
+/* 🔥 简化hover效果 */
 .first-row-zone:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(155, 89, 182, 0.4);
-  border-color: #bb8fce;
+  box-shadow: 0 3px 10px rgba(155, 89, 182, 0.3);
 }
 
+/* 🔥 简化active状态 - 移除复杂颜色变化 */
 .first-row-zone.active {
   border-color: #f39c12;
-  background: linear-gradient(135deg, #f39c12 0%, #9b59b6 100%);
-  box-shadow: 0 0 15px rgba(243, 156, 18, 0.6);
+  box-shadow: 0 0 10px rgba(243, 156, 18, 0.4);
 }
 
 .first-row-zone.winning {
@@ -187,8 +193,14 @@ const showLoseAnimation = () => {
   animation: losePulse 1s ease-in-out 3;
 }
 
+/* 🔥 简化点击效果 */
 .first-row-zone.clicked {
-  animation: clickPulse 0.2s ease-out;
+  animation: clickPulse 0.15s ease-out;
+}
+
+/* 🔥 新增：闪烁效果 */
+.first-row-zone.blinking {
+  animation: blinkEffect 1s ease-in-out infinite;
 }
 
 .zone-header {
@@ -292,6 +304,18 @@ const showLoseAnimation = () => {
   z-index: 100;
 }
 
+/* 🔥 闪烁动画 */
+@keyframes blinkEffect {
+  0%, 50% {
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+    border-color: #ffd700;
+  }
+  51%, 100% {
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    border-color: rgba(255, 215, 0, 0.6);
+  }
+}
+
 /* 动画效果 */
 @keyframes winPulse {
   0%, 100% {
@@ -311,12 +335,13 @@ const showLoseAnimation = () => {
   }
 }
 
+/* 🔥 简化点击动画 */
 @keyframes clickPulse {
   0% {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.05);
+    transform: scale(1.02);
   }
   100% {
     transform: scale(1);

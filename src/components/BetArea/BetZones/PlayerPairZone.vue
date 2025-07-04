@@ -1,6 +1,6 @@
 <template>
   <div
-    class="bet-zone player-zone second-row-zone"
+    class="bet-zone player-pair-zone first-row-zone"
     :class="{
       'active': hasActiveBet,
       'winning': isWinning,
@@ -10,36 +10,24 @@
     @click="handleBetClick"
   >
     <div class="zone-header">
-      <div class="zone-title">闲</div>
-      <div class="zone-odds">1:1</div>
+      <div class="zone-title">闲对</div>
+      <div class="zone-odds">1:11</div>
     </div>
 
-    <div class="bet-content">
-      <!-- 用户自己的投注金额 -->
-      <div class="user-bet-info">
-        <div class="user-bet-amount" v-if="displayData.userAmount > 0">
-          {{ formatAmount(displayData.userAmount) }}
-        </div>
+    <div class="bet-info">
+      <div class="bet-amount" v-if="betAmount > 0">
+        ${{ formatAmount(betAmount) }}
       </div>
-
-      <!-- 其他用户信息 - 简化显示 -->
-      <div class="other-users-info">
-        <div class="user-count">
-          <span class="count-icon">👥</span>
-          {{ displayData.otherPlayerCount }}
-        </div>
-        <div class="total-amount">
-          <span class="money-icon">💰</span>
-          ${{ formatAmount(displayData.otherTotalAmount) }}
-        </div>
+      <div class="no-bet-placeholder" v-else>
+        -
       </div>
     </div>
 
-    <!-- 用户投注筹码显示 (使用图片) -->
-    <div class="chips-container" v-if="displayData.userAmount > 0">
+    <!-- 投注筹码显示 -->
+    <div class="chips-container" v-if="betAmount > 0">
       <div class="chip-stack">
         <img
-          v-for="(chip, index) in displayData.chipImages"
+          v-for="(chip, index) in chipImages"
           :key="index"
           :src="chip.image"
           :alt="`${chip.value}筹码`"
@@ -71,7 +59,7 @@ import { useBettingStore } from '@/stores/bettingStore'
 const bettingStore = useBettingStore()
 
 // 投注区域ID
-const ZONE_ID = 'player'
+const ZONE_ID = 'player-pair'
 
 // 响应式数据
 const isWinning = ref(false)
@@ -81,8 +69,12 @@ const winAmount = ref(0)
 const statusMessage = ref('')
 
 // 计算属性
+const betAmount = computed(() => {
+  return bettingStore.currentBets[ZONE_ID] || 0
+})
+
 const hasActiveBet = computed(() => {
-  return (bettingStore.currentBets[ZONE_ID] || 0) > 0
+  return betAmount.value > 0
 })
 
 // 🔥 新增：闪烁状态
@@ -90,9 +82,9 @@ const isBlinking = computed(() => {
   return bettingStore.isZoneBlinking(ZONE_ID)
 })
 
-// 获取显示数据（包含用户投注、其他用户数据、筹码图片）- 使用公共方法
-const displayData = computed(() => {
-  return bettingStore.getBetZoneDisplayData(ZONE_ID)
+// 获取筹码图片 - 使用公共方法
+const chipImages = computed(() => {
+  return bettingStore.getChipImages(betAmount.value)
 })
 
 // 方法
@@ -101,7 +93,7 @@ const handleBetClick = () => {
   const result = bettingStore.placeBet(ZONE_ID, bettingStore.selectedChip)
 
   if (result.success) {
-    console.log('闲投注成功:', result.amount)
+    console.log('闲对投注成功:', result.amount)
     showStatusMessage(result.message, 'success')
 
     // 触觉反馈
@@ -112,13 +104,13 @@ const handleBetClick = () => {
     // 简化点击动画
     animateClick()
   } else {
-    console.log('闲投注失败:', result.message)
+    console.log('闲对投注失败:', result.message)
     showStatusMessage(result.message, 'error')
   }
 }
 
 const animateClick = () => {
-  const element = document.querySelector('.player-zone')
+  const element = document.querySelector('.player-pair-zone')
   if (element) {
     element.classList.add('clicked')
     setTimeout(() => {
@@ -136,7 +128,7 @@ const showStatusMessage = (message: string, type: 'success' | 'error' = 'success
   statusMessage.value = message
   setTimeout(() => {
     statusMessage.value = ''
-  }, 3000)
+  }, 2000)
 }
 
 const showWinAnimation = (amount: number) => {
@@ -159,57 +151,55 @@ const showLoseAnimation = () => {
 </script>
 
 <style scoped>
-/* 🔥 修复第二排主要投注区域样式 - 蓝色主题 */
-.second-row-zone {
+/* 🔥 简化第一排边注区域样式 - 绿色 */
+.first-row-zone {
   position: relative;
-  background: linear-gradient(135deg, #1f4e79 0%, #2980b9 100%);
-  border: 2px solid #3498db; /* 🔥 减小边框厚度 */
-  border-radius: 10px; /* 🔥 减小圆角 */
-  padding: 8px; /* 🔥 减小内边距 */
+  background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+  border: 2px solid #2ecc71;
+  border-radius: 8px;
+  padding: 6px;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   overflow: hidden;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3); /* 🔥 减小阴影 */
-  font-size: 13px; /* 🔥 减小字体 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  font-size: 12px;
   height: 100%;
-  max-width: 100%; /* 🔥 防止超出 */
-  box-sizing: border-box; /* 🔥 确保边框计入总宽度 */
 }
 
 /* 🔥 简化hover效果 */
-.second-row-zone:hover {
-  transform: translateY(-1px); /* 🔥 减小移动距离 */
-  box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3); /* 🔥 减弱阴影 */
+.first-row-zone:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(46, 204, 113, 0.3);
 }
 
-/* 🔥 简化active状态 - 移除过多颜色变化 */
-.second-row-zone.active {
+/* 🔥 简化active状态 - 移除复杂颜色变化 */
+.first-row-zone.active {
   border-color: #f39c12;
-  box-shadow: 0 0 12px rgba(243, 156, 18, 0.5); /* 🔥 减弱发光效果 */
+  box-shadow: 0 0 10px rgba(243, 156, 18, 0.4);
 }
 
-.second-row-zone.winning {
-  background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
-  border-color: #2ecc71;
+.first-row-zone.winning {
+  background: linear-gradient(135deg, #f39c12 0%, #f1c40f 100%);
+  border-color: #f39c12;
   animation: winPulse 2s ease-in-out infinite;
 }
 
-.second-row-zone.losing {
+.first-row-zone.losing {
   background: linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%);
   border-color: #95a5a6;
   animation: losePulse 1s ease-in-out 3;
 }
 
 /* 🔥 简化点击效果 */
-.second-row-zone.clicked {
-  animation: clickPulse 0.15s ease-out; /* 🔥 减短动画时间 */
+.first-row-zone.clicked {
+  animation: clickPulse 0.15s ease-out;
 }
 
 /* 🔥 新增：闪烁效果 */
-.second-row-zone.blinking {
+.first-row-zone.blinking {
   animation: blinkEffect 1s ease-in-out infinite;
 }
 
@@ -217,83 +207,54 @@ const showLoseAnimation = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px; /* 🔥 减小间距 */
+  margin-bottom: 4px;
 }
 
 .zone-title {
-  font-size: 18px; /* 🔥 减小标题字体 */
+  font-size: 13px;
   font-weight: bold;
   color: #ffffff;
-  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
 .zone-odds {
-  font-size: 11px; /* 🔥 减小赔率字体 */
+  font-size: 9px;
   color: #f1c40f;
   font-weight: 600;
   background: rgba(0, 0, 0, 0.4);
-  padding: 3px 6px; /* 🔥 减小内边距 */
+  padding: 2px 4px;
   border-radius: 6px;
   border: 1px solid rgba(241, 196, 15, 0.3);
 }
 
-.bet-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px; /* 🔥 减小间距 */
-  flex: 1;
-}
-
-.user-bet-info {
+.bet-info {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 18px; /* 🔥 减小最小高度 */
+  min-height: 18px;
+  flex: 1;
 }
 
-.user-bet-amount {
-  font-size: 12px; /* 🔥 减小字体 */
+.bet-amount {
+  font-size: 11px;
   font-weight: bold;
   color: #ffffff;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
   background: rgba(0, 0, 0, 0.3);
-  padding: 3px 6px; /* 🔥 减小内边距 */
+  padding: 2px 6px;
   border-radius: 4px;
 }
 
-.other-users-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 10px; /* 🔥 减小字体 */
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.user-count {
-  display: flex;
-  align-items: center;
-  gap: 3px; /* 🔥 减小间距 */
-}
-
-.count-icon {
-  font-size: 11px; /* 🔥 减小图标 */
-}
-
-.total-amount {
-  display: flex;
-  align-items: center;
-  gap: 3px; /* 🔥 减小间距 */
-  font-weight: 600;
-}
-
-.money-icon {
-  font-size: 11px; /* 🔥 减小图标 */
+.no-bet-placeholder {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 300;
 }
 
 .chips-container {
   position: absolute;
-  bottom: 6px; /* 🔥 调整位置 */
-  right: 6px;
+  bottom: 4px;
+  right: 4px;
   pointer-events: none;
 }
 
@@ -305,11 +266,11 @@ const showLoseAnimation = () => {
 }
 
 .chip-image {
-  width: 20px; /* 🔥 减小筹码图片尺寸 */
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   transition: all 0.3s ease;
 }
 
@@ -323,7 +284,7 @@ const showLoseAnimation = () => {
 }
 
 .win-amount {
-  font-size: 16px; /* 🔥 减小字体 */
+  font-size: 12px;
   font-weight: bold;
   color: #f39c12;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
@@ -331,38 +292,37 @@ const showLoseAnimation = () => {
 
 .bet-status-indicator {
   position: absolute;
-  bottom: -28px; /* 🔥 调整位置 */
+  bottom: -25px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.9);
+  background: rgba(0, 0, 0, 0.8);
   color: #f39c12;
-  padding: 4px 8px; /* 🔥 减小内边距 */
+  padding: 4px 8px;
   border-radius: 4px;
-  font-size: 11px; /* 🔥 减小字体 */
+  font-size: 10px;
   white-space: nowrap;
   z-index: 100;
-  border: 1px solid rgba(243, 156, 18, 0.3);
 }
 
 /* 🔥 闪烁动画 */
 @keyframes blinkEffect {
   0%, 50% {
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
     border-color: #ffd700;
   }
   51%, 100% {
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
     border-color: rgba(255, 215, 0, 0.6);
   }
 }
 
-/* 其他动画效果 */
+/* 动画效果 */
 @keyframes winPulse {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(46, 204, 113, 0.5);
+    box-shadow: 0 0 15px rgba(243, 156, 18, 0.5);
   }
   50% {
-    box-shadow: 0 0 25px rgba(46, 204, 113, 0.8);
+    box-shadow: 0 0 25px rgba(243, 156, 18, 0.8);
   }
 }
 
@@ -381,7 +341,7 @@ const showLoseAnimation = () => {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.02); /* 🔥 减小缩放比例 */
+    transform: scale(1.02);
   }
   100% {
     transform: scale(1);
@@ -399,97 +359,52 @@ const showLoseAnimation = () => {
   }
 }
 
-/* 🔥 加强响应式适配 */
+/* 响应式适配 */
 @media (max-width: 768px) {
-  .second-row-zone {
-    padding: 6px;
-    font-size: 12px;
-  }
-
-  .zone-title {
-    font-size: 16px;
-  }
-
-  .zone-odds {
-    font-size: 10px;
-    padding: 2px 4px;
-  }
-
-  .user-bet-amount {
-    font-size: 11px;
-  }
-
-  .other-users-info {
-    font-size: 9px;
-  }
-
-  .chip-image {
-    width: 18px;
-    height: 18px;
-  }
-}
-
-@media (max-width: 480px) {
-  .second-row-zone {
+  .first-row-zone {
     padding: 4px;
     font-size: 11px;
   }
 
   .zone-title {
-    font-size: 14px;
-  }
-
-  .zone-odds {
-    font-size: 9px;
-    padding: 2px 3px;
-  }
-
-  .user-bet-amount {
-    font-size: 10px;
-    padding: 2px 4px;
-  }
-
-  .other-users-info {
-    font-size: 8px;
-  }
-
-  .chip-image {
-    width: 16px;
-    height: 16px;
-  }
-
-  .bet-status-indicator {
-    font-size: 10px;
-    padding: 3px 6px;
-  }
-}
-
-/* 🔥 额外的小屏幕适配 */
-@media (max-width: 360px) {
-  .second-row-zone {
-    padding: 3px;
-    font-size: 10px;
-  }
-
-  .zone-title {
-    font-size: 13px;
+    font-size: 11px;
   }
 
   .zone-odds {
     font-size: 8px;
   }
 
-  .user-bet-amount {
-    font-size: 9px;
-  }
-
-  .other-users-info {
-    font-size: 8px;
+  .bet-amount {
+    font-size: 10px;
   }
 
   .chip-image {
     width: 14px;
     height: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .first-row-zone {
+    padding: 3px;
+    font-size: 10px;
+  }
+
+  .zone-title {
+    font-size: 10px;
+  }
+
+  .zone-odds {
+    font-size: 7px;
+  }
+
+  .bet-amount {
+    font-size: 9px;
+  }
+
+  .chip-image {
+    width: 12px;
+    height: 12px;
   }
 }
 </style>

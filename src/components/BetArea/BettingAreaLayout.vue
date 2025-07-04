@@ -167,7 +167,7 @@ onMounted(() => {
 }
 
 .first-row {
-  flex: 0.6; /* 🔥 第一排占较少空间 */
+  flex: 1; /* 🔥 第一排占较少空间 */
   min-height: 50px;
 }
 
@@ -253,7 +253,7 @@ onMounted(() => {
   }
 
   .first-row {
-    flex: 0.5;
+    flex: 1;
     min-height: 45px;
   }
 
@@ -277,7 +277,7 @@ onMounted(() => {
   }
 
   .first-row {
-    flex: 0.45;
+    flex: 1;
     min-height: 40px;
   }
 

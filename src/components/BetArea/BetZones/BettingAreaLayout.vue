@@ -81,9 +81,7 @@ const countdown = ref(30)
 const gamePhase = ref<'waiting' | 'betting' | 'dealing' | 'result'>('betting')
 
 // 计算属性
-const totalBetAmount = computed((): number => {
-  return Object.values(bettingStore.currentBets).reduce((sum: number, amount: number) => sum + amount, 0)
-})
+const totalBetAmount = computed(() => bettingStore.totalBetAmount)
 
 const balance = computed((): number => bettingStore.balance)
 const selectedChip = computed((): number => bettingStore.selectedChip)

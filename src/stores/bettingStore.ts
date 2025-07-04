@@ -22,16 +22,31 @@ export interface ChipData {
   displayValue: string
 }
 
-// 筹码图片映射 - 统一管理
+// 筹码图片映射 - 根据实际文件完整映射
 export const CHIP_IMAGE_MAP: Record<number, string> = {
-  1: '/images/chips/1.png',
-  5: '/images/chips/5.png',
-  10: '/images/chips/10.png',
-  25: '/images/chips/25.png',
-  50: '/images/chips/50.png',
-  100: '/images/chips/100.png',
-  500: '/images/chips/500.png',
-  1000: '/images/chips/1000.png'
+  1: '/src/assets/images/chips/B_01.png',
+  5: '/src/assets/images/chips/B_05.png',
+  10: '/src/assets/images/chips/B_10.png',
+  20: '/src/assets/images/chips/B_20.png',
+  50: '/src/assets/images/chips/B_50.png',
+  100: '/src/assets/images/chips/B_100.png',
+  500: '/src/assets/images/chips/B_500.png',
+  1000: '/src/assets/images/chips/B_1K.png',
+  5000: '/src/assets/images/chips/B_5K.png',
+  10000: '/src/assets/images/chips/B_10K.png',
+  20000: '/src/assets/images/chips/B_20K.png',
+  50000: '/src/assets/images/chips/B_50K.png',
+  100000: '/src/assets/images/chips/B_100K.png',
+  200000: '/src/assets/images/chips/B_200K.png',
+  1000000: '/src/assets/images/chips/B_1M.png',
+  5000000: '/src/assets/images/chips/B_5M.png',
+  10000000: '/src/assets/images/chips/B_10M.png',
+  20000000: '/src/assets/images/chips/B_20M.png',
+  50000000: '/src/assets/images/chips/B_50M.png',
+  100000000: '/src/assets/images/chips/B_100M.png',
+  200000000: '/src/assets/images/chips/B_200M.png',
+  500000000: '/src/assets/images/chips/B_500M.png',
+  1000000000: '/src/assets/images/chips/B_1000M.png'
 }
 
 // 投注区域配置
@@ -157,16 +172,31 @@ export const BET_ZONE_CONFIGS: Record<BaccaratBetType, BetZoneConfig> = {
   }
 }
 
-// 所有可用筹码
+// 所有可用筹码 - 去掉"元"，名称简化
 export const AVAILABLE_CHIPS: ChipData[] = [
-  { id: 'chip-1', value: 1, name: '1元', image: CHIP_IMAGE_MAP[1], displayValue: '1' },
-  { id: 'chip-5', value: 5, name: '5元', image: CHIP_IMAGE_MAP[5], displayValue: '5' },
-  { id: 'chip-10', value: 10, name: '10元', image: CHIP_IMAGE_MAP[10], displayValue: '10' },
-  { id: 'chip-25', value: 25, name: '25元', image: CHIP_IMAGE_MAP[25], displayValue: '25' },
-  { id: 'chip-50', value: 50, name: '50元', image: CHIP_IMAGE_MAP[50], displayValue: '50' },
-  { id: 'chip-100', value: 100, name: '100元', image: CHIP_IMAGE_MAP[100], displayValue: '100' },
-  { id: 'chip-500', value: 500, name: '500元', image: CHIP_IMAGE_MAP[500], displayValue: '500' },
-  { id: 'chip-1000', value: 1000, name: '1000元', image: CHIP_IMAGE_MAP[1000], displayValue: '1K' }
+  { id: 'chip-1', value: 1, name: '1', image: CHIP_IMAGE_MAP[1], displayValue: '1' },
+  { id: 'chip-5', value: 5, name: '5', image: CHIP_IMAGE_MAP[5], displayValue: '5' },
+  { id: 'chip-10', value: 10, name: '10', image: CHIP_IMAGE_MAP[10], displayValue: '10' },
+  { id: 'chip-20', value: 20, name: '20', image: CHIP_IMAGE_MAP[20], displayValue: '20' },
+  { id: 'chip-50', value: 50, name: '50', image: CHIP_IMAGE_MAP[50], displayValue: '50' },
+  { id: 'chip-100', value: 100, name: '100', image: CHIP_IMAGE_MAP[100], displayValue: '100' },
+  { id: 'chip-500', value: 500, name: '500', image: CHIP_IMAGE_MAP[500], displayValue: '500' },
+  { id: 'chip-1000', value: 1000, name: '1K', image: CHIP_IMAGE_MAP[1000], displayValue: '1K' },
+  { id: 'chip-5000', value: 5000, name: '5K', image: CHIP_IMAGE_MAP[5000], displayValue: '5K' },
+  { id: 'chip-10000', value: 10000, name: '10K', image: CHIP_IMAGE_MAP[10000], displayValue: '10K' },
+  { id: 'chip-20000', value: 20000, name: '20K', image: CHIP_IMAGE_MAP[20000], displayValue: '20K' },
+  { id: 'chip-50000', value: 50000, name: '50K', image: CHIP_IMAGE_MAP[50000], displayValue: '50K' },
+  { id: 'chip-100000', value: 100000, name: '100K', image: CHIP_IMAGE_MAP[100000], displayValue: '100K' },
+  { id: 'chip-200000', value: 200000, name: '200K', image: CHIP_IMAGE_MAP[200000], displayValue: '200K' },
+  { id: 'chip-1000000', value: 1000000, name: '1M', image: CHIP_IMAGE_MAP[1000000], displayValue: '1M' },
+  { id: 'chip-5000000', value: 5000000, name: '5M', image: CHIP_IMAGE_MAP[5000000], displayValue: '5M' },
+  { id: 'chip-10000000', value: 10000000, name: '10M', image: CHIP_IMAGE_MAP[10000000], displayValue: '10M' },
+  { id: 'chip-20000000', value: 20000000, name: '20M', image: CHIP_IMAGE_MAP[20000000], displayValue: '20M' },
+  { id: 'chip-50000000', value: 50000000, name: '50M', image: CHIP_IMAGE_MAP[50000000], displayValue: '50M' },
+  { id: 'chip-100000000', value: 100000000, name: '100M', image: CHIP_IMAGE_MAP[100000000], displayValue: '100M' },
+  { id: 'chip-200000000', value: 200000000, name: '200M', image: CHIP_IMAGE_MAP[200000000], displayValue: '200M' },
+  { id: 'chip-500000000', value: 500000000, name: '500M', image: CHIP_IMAGE_MAP[500000000], displayValue: '500M' },
+  { id: 'chip-1000000000', value: 1000000000, name: '1000M', image: CHIP_IMAGE_MAP[1000000000], displayValue: '1000M' }
 ]
 
 // 投注区域模拟数据
@@ -276,6 +306,9 @@ export const useBettingStore = defineStore('betting', () => {
     'panda-8': null
   })
 
+  // 🔥 新增：闪烁效果管理
+  const blinkingZones = ref<Set<BaccaratBetType>>(new Set())
+
   // 计算属性
   const totalBetAmount = computed(() => {
     return Object.values(currentBets).reduce((sum, amount) => sum + amount, 0)
@@ -301,13 +334,14 @@ export const useBettingStore = defineStore('betting', () => {
 
     const chips: Array<{value: number, image: string}> = []
     let remaining = amount
-    const chipValues = [1000, 500, 100, 50, 25, 10, 5, 1]
+    // 更新筹码面额数组
+    const chipValues = [1000000000, 500000000, 200000000, 100000000, 50000000, 20000000, 10000000, 5000000, 1000000, 200000, 100000, 50000, 20000, 10000, 5000, 1000, 500, 100, 50, 20, 10, 5, 1]
 
     for (const value of chipValues) {
       while (remaining >= value && chips.length < 6) {
         chips.push({
           value,
-          image: CHIP_IMAGE_MAP[value] || '/images/chips/default.png'
+          image: CHIP_IMAGE_MAP[value] || '/src/assets/images/chips/default.png'
         })
         remaining -= value
       }
@@ -454,6 +488,23 @@ export const useBettingStore = defineStore('betting', () => {
     })
   }
 
+  // 🔥 新增：闪烁效果管理方法
+  const startBlinking = (zoneId: BaccaratBetType): void => {
+    blinkingZones.value.add(zoneId)
+  }
+
+  const stopBlinking = (zoneId: BaccaratBetType): void => {
+    blinkingZones.value.delete(zoneId)
+  }
+
+  const stopAllBlinking = (): void => {
+    blinkingZones.value.clear()
+  }
+
+  const isZoneBlinking = (zoneId: BaccaratBetType): boolean => {
+    return blinkingZones.value.has(zoneId)
+  }
+
   // 开始模拟数据更新
   const startSimulationUpdates = (): void => {
     Object.keys(BET_ZONE_CONFIGS).forEach(betType => {
@@ -551,6 +602,9 @@ export const useBettingStore = defineStore('betting', () => {
       lastBets[betType as BaccaratBetType] = 0
     })
 
+    // 清空闪烁效果
+    stopAllBlinking()
+
     // 开始模拟数据更新
     startSimulationUpdates()
 
@@ -566,6 +620,9 @@ export const useBettingStore = defineStore('betting', () => {
 
     // 清空当前投注
     clearAllBets()
+
+    // 停止所有闪烁效果
+    stopAllBlinking()
 
     // 停止模拟数据更新
     stopSimulationUpdates()
@@ -584,6 +641,7 @@ export const useBettingStore = defineStore('betting', () => {
     betLimits,
     displayChips,
     availableChips,
+    blinkingZones,
 
     // 计算属性
     totalBetAmount,
@@ -607,6 +665,12 @@ export const useBettingStore = defineStore('betting', () => {
     formatAmount,
     init,
     clearRound,
+
+    // 🔥 新增：闪烁效果方法
+    startBlinking,
+    stopBlinking,
+    stopAllBlinking,
+    isZoneBlinking,
 
     // 配置常量
     BET_ZONE_CONFIGS,

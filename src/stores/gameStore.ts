@@ -1,4 +1,3 @@
-// src/stores/gameStore.ts - 简化版
 import { defineStore } from 'pinia'
 
 // 游戏状态类型

@@ -45,7 +45,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, type CSSProperties } from 'vue'
-// 🔥 修改：使用 networkService 而不是 gameStore
 import { useNetworkService } from '@/services/networkService'
 
 // 组件导入

@@ -272,15 +272,22 @@ const getChipSelectorPosition = (): { x: number; y: number } | null => {
 // 🔥 新增：获取当前选中筹码信息的方法
 const getCurrentChipInfo = (): { value: number; image: string } => {
   try {
-    // 尝试从 betting store 获取当前选中的筹码
-    const currentChipValue = (bettingStore as any).selectedChipValue ||
-                            (bettingStore as any).currentChipValue ||
-                            10
+    // 从 bettingStore 获取当前选中的筹码
+    const currentChipValue = bettingStore.selectedChip || 10
 
-    // 获取筹码图片，可能需要根据实际的 store 结构调整
-    const chipImage = (bettingStore as any).getChipImageByValue?.(currentChipValue) ||
-                     (bettingStore as any).chipImages?.[currentChipValue] ||
-                     `/src/assets/images/chips/chip-${currentChipValue}.png`
+    // 获取筹码图片 - 使用 bettingStore 中的方法或映射
+    let chipImage = ''
+
+    // 尝试从 displayChips 或 availableChips 中找到对应的筹码图片
+    const displayChips = bettingStore.getDisplayChipsData || bettingStore.displayChips || []
+    const matchedChip = displayChips.find((chip: any) => chip.value === currentChipValue)
+
+    if (matchedChip && matchedChip.image) {
+      chipImage = matchedChip.image
+    } else {
+      // 使用 CHIP_IMAGE_MAP 的映射格式
+      chipImage = `/src/assets/images/chips/chip-${currentChipValue}.png`
+    }
 
     return {
       value: currentChipValue,

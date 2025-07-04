@@ -66,6 +66,21 @@
           <span class="btn-text">重复</span>
         </button>
 
+        <!-- 🔥 新增：免佣按钮 -->
+        <button
+          class="control-btn control-btn-commission"
+          :class="{ 'active': isCommissionFree }"
+          @click="handleCommissionToggle"
+          :title="isCommissionFree ? '关闭免佣' : '开启免佣'"
+        >
+          <div class="btn-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.5 6L12 10.5 8.5 8 12 5.5 15.5 8zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+            </svg>
+          </div>
+          <span class="btn-text">{{ isCommissionFree ? '免佣' : '佣金' }}</span>
+        </button>
+
         <!-- 更多按钮 -->
         <button
           class="control-btn control-btn-more"
@@ -102,9 +117,11 @@ try {
     getDisplayChipsData: [],
     hasLastRoundData: false,
     betHistory: [],
+    isCommissionFree: false,
     selectChip: () => {},
     undoLastBet: () => {},
-    restoreLastRound: () => {}
+    restoreLastRound: () => {},
+    toggleCommissionFree: () => {}
   }
 }
 
@@ -128,6 +145,15 @@ const canUndo = computed(() => {
 const canRepeat = computed(() => {
   try {
     return bettingStore?.hasLastRoundData || false
+  } catch (error) {
+    return false
+  }
+})
+
+// 🔥 新增：免佣状态
+const isCommissionFree = computed(() => {
+  try {
+    return bettingStore?.isCommissionFree || false
   } catch (error) {
     return false
   }
@@ -162,6 +188,16 @@ const handleRepeat = () => {
     console.log('🔄 执行重复操作')
   } catch (error) {
     console.error('❌ 重复投注失败:', error)
+  }
+}
+
+// 🔥 新增：免佣切换处理
+const handleCommissionToggle = () => {
+  try {
+    bettingStore?.toggleCommissionFree?.()
+    console.log(`🎯 免佣状态切换: ${isCommissionFree.value ? '关闭' : '开启'}`)
+  } catch (error) {
+    console.error('❌ 免佣状态切换失败:', error)
   }
 }
 
@@ -332,6 +368,31 @@ const handleImageError = (event: Event) => {
   color: #69c0ff;
 }
 
+/* 🔥 新增：免佣按钮样式 */
+.control-btn-commission {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.control-btn-commission:hover {
+  background: rgba(255, 193, 7, 0.1);
+  border-color: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+}
+
+.control-btn-commission.active {
+  background: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.4);
+  color: #ffc107;
+  box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+}
+
+.control-btn-commission.active .btn-icon {
+  animation: commissionPulse 2s ease-in-out infinite;
+}
+
 .btn-icon {
   display: flex;
   align-items: center;
@@ -353,6 +414,16 @@ const handleImageError = (event: Event) => {
   }
   100% {
     transform: scale(1);
+  }
+}
+
+/* 🔥 新增：免佣按钮动画 */
+@keyframes commissionPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
   }
 }
 

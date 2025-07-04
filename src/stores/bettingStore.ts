@@ -1,4 +1,4 @@
-// src/stores/bettingStore.ts - 增强版，支持筹码选择器
+// src/stores/bettingStore.ts - 基于上传文件修正版本
 import { defineStore } from 'pinia'
 import { ref, computed, reactive } from 'vue'
 
@@ -13,7 +13,7 @@ export type BaccaratBetType =
   | 'dragon-7'      // 龙7
   | 'panda-8'       // 熊8
 
-// 🔥 新增：筹码数据接口
+// 筹码数据接口
 export interface ChipData {
   id: string
   value: number
@@ -22,7 +22,7 @@ export interface ChipData {
   displayValue: string
 }
 
-// 🔥 新增：所有可用筹码
+// 所有可用筹码
 export const AVAILABLE_CHIPS: ChipData[] = [
   { id: 'chip-1', value: 1, name: '1元', image: '/src/assets/images/chips/1.png', displayValue: '1' },
   { id: 'chip-5', value: 5, name: '5元', image: '/src/assets/images/chips/5.png', displayValue: '5' },
@@ -70,11 +70,11 @@ export const useBettingStore = defineStore('betting', () => {
   // 3. 当前选中筹码
   const selectedChip = ref(10)
 
-  // 🔥 新增：筹码选择器相关状态
-  const displayChips = ref<string[]>(['chip-10', 'chip-50', 'chip-100']) // 默认显示的筹码ID
-  const availableChips = ref(AVAILABLE_CHIPS) // 所有可用筹码
+  // 4. 筹码选择器相关状态
+  const displayChips = ref<string[]>(['chip-10', 'chip-50', 'chip-100'])
+  const availableChips = ref(AVAILABLE_CHIPS)
 
-  // 4. 投注区域模拟数据
+  // 5. 投注区域模拟数据
   const zoneSimulationData = reactive<Record<BaccaratBetType, BetZoneData>>({
     'banker': { totalAmount: 12580, playerCount: 23 },
     'player': { totalAmount: 8960, playerCount: 18 },
@@ -86,7 +86,7 @@ export const useBettingStore = defineStore('betting', () => {
     'panda-8': { totalAmount: 280, playerCount: 2 }
   })
 
-  // 5. 用户投注金额
+  // 6. 用户投注金额
   const userBets = reactive<Record<BaccaratBetType, number>>({
     'banker': 0,
     'player': 0,
@@ -98,7 +98,10 @@ export const useBettingStore = defineStore('betting', () => {
     'panda-8': 0
   })
 
-  // 6. 中奖闪烁状态
+  // 🔥 关键修正：添加 currentBets 别名，指向 userBets
+  const currentBets = computed(() => userBets)
+
+  // 7. 中奖闪烁状态
   const winningFlash = reactive<Record<BaccaratBetType, boolean>>({
     'banker': false,
     'player': false,
@@ -110,36 +113,70 @@ export const useBettingStore = defineStore('betting', () => {
     'panda-8': false
   })
 
-  // 7. 免佣状态
+  // 8. 免佣状态
   const isCommissionFree = ref(false)
+
+  // 9. 🔥 新增：余额和游戏状态
+  const balance = ref(10000)
+  const gamePhase = ref<'waiting' | 'betting' | 'dealing' | 'result'>('betting')
 
   // 📊 计算属性
   const totalUserBets = computed(() => {
     return Object.values(userBets).reduce((sum, amount) => sum + amount, 0)
   })
 
+  // 🔥 新增：为了兼容性，添加 totalBetAmount 别名
+  const totalBetAmount = computed(() => totalUserBets.value)
+
   const hasLastRoundData = computed(() => {
     return Object.values(lastRoundBets.value).some(amount => amount > 0)
   })
 
-  // 🔥 新增：获取显示的筹码数据
+  // 获取显示的筹码数据
   const getDisplayChipsData = computed(() => {
     return availableChips.value.filter(chip =>
       displayChips.value.includes(chip.id)
     )
   })
 
-  // 🔥 新增：获取当前筹码数据
+  // 获取当前筹码数据
   const getCurrentChipData = computed(() => {
     return availableChips.value.find(chip => chip.value === selectedChip.value)
   })
 
-  // 🔥 新增：检查筹码是否可用
+  // 检查筹码是否可用
   const isChipAvailable = computed(() => {
     return (chipValue: number) => {
       return availableChips.value.some(chip => chip.value === chipValue)
     }
   })
+
+  // 🔥 新增：投注操作方法
+  const placeBet = (betType: BaccaratBetType, amount: number): boolean => {
+    if (gamePhase.value !== 'betting') {
+      console.warn('当前不在投注阶段')
+      return false
+    }
+
+    if (balance.value < amount) {
+      console.warn('余额不足')
+      return false
+    }
+
+    // 添加投注
+    userBets[betType] += amount
+
+    // 记录到历史
+    betHistory.value.push({
+      betType,
+      amount,
+      action: 'add',
+      timestamp: Date.now()
+    })
+
+    console.log(`✅ 投注成功: ${betType} +${amount}`)
+    return true
+  }
 
   // 🔧 核心方法
 
@@ -154,7 +191,7 @@ export const useBettingStore = defineStore('betting', () => {
     }
   }
 
-  // 🔥 新增：更新显示筹码
+  // 更新显示筹码
   const updateDisplayChips = (chipIds: string[]): void => {
     // 验证所有 chipId 都存在
     const validChipIds = chipIds.filter(id =>
@@ -184,12 +221,12 @@ export const useBettingStore = defineStore('betting', () => {
     }
   }
 
-  // 🔥 新增：根据ID获取筹码数据
+  // 根据ID获取筹码数据
   const getChipById = (id: string): ChipData | undefined => {
     return availableChips.value.find(chip => chip.id === id)
   }
 
-  // 🔥 新增：根据值获取筹码数据
+  // 根据值获取筹码数据
   const getChipByValue = (value: number): ChipData | undefined => {
     return availableChips.value.find(chip => chip.value === value)
   }
@@ -305,6 +342,10 @@ export const useBettingStore = defineStore('betting', () => {
 
   // 格式化金额显示
   const formatAmount = (amount: number): string => {
+    // 🔥 修正：添加参数验证
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return '0'
+    }
     return amount.toLocaleString()
   }
 
@@ -321,7 +362,7 @@ export const useBettingStore = defineStore('betting', () => {
     console.log(`➕ 添加投注: ${betType} +${amount}`)
   }
 
-  // 🔥 新增：重置筹码设置为默认
+  // 重置筹码设置为默认
   const resetChipSettings = (): void => {
     displayChips.value = ['chip-10', 'chip-50', 'chip-100']
     selectedChip.value = 10
@@ -336,8 +377,10 @@ export const useBettingStore = defineStore('betting', () => {
     betHistory.value = []
     selectedChip.value = 10
     isCommissionFree.value = false
+    balance.value = 10000
+    gamePhase.value = 'betting'
 
-    // 🔥 重置筹码设置
+    // 重置筹码设置
     displayChips.value = ['chip-10', 'chip-50', 'chip-100']
 
     // 重置上一局投注
@@ -367,11 +410,15 @@ export const useBettingStore = defineStore('betting', () => {
     availableChips,
     zoneSimulationData,
     userBets,
+    currentBets,      // 🔥 新增：兼容性别名
     winningFlash,
     isCommissionFree,
+    balance,          // 🔥 新增
+    gamePhase,        // 🔥 新增
 
     // 计算属性
     totalUserBets,
+    totalBetAmount,   // 🔥 新增：兼容性别名
     hasLastRoundData,
     getDisplayChipsData,
     getCurrentChipData,
@@ -379,6 +426,7 @@ export const useBettingStore = defineStore('betting', () => {
 
     // 方法
     selectChip,
+    placeBet,         // 🔥 新增：投注方法
     updateDisplayChips,
     getChipById,
     getChipByValue,

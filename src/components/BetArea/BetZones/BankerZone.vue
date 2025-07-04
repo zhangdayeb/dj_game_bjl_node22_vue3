@@ -17,7 +17,7 @@
       <!-- 用户自己的投注金额 -->
       <div class="user-bet-info">
         <div class="user-bet-amount" v-if="displayData.userAmount > 0">
-          我的投注: ${{ formatAmount(displayData.userAmount) }}
+          {{ formatAmount(displayData.userAmount) }}
         </div>
       </div>
 
